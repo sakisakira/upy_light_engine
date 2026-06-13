@@ -90,11 +90,11 @@ class Framebuffer:
                     dg = (dst_val >> 5) & 0x3F
                     db = dst_val & 0x1F
                     
-                    inv_a = 15 - a
-                    # (Src * A + Dst * Inv_A) / 15 でブレンド
-                    out_r = (sr * a + dr * inv_a) // 15
-                    out_g = (sg * a + dg * inv_a) // 15
-                    out_b = (sb * a + db * inv_a) // 15
+                    inv_a = 16 - a
+                    # 割り算の代わりにビットシフト(>> 4)で高速化
+                    out_r = (sr * a + dr * inv_a) >> 4
+                    out_g = (sg * a + dg * inv_a) >> 4
+                    out_b = (sb * a + db * inv_a) >> 4
                     
                     # RGB565にパックして書き戻す
                     dst_mv[dst_idx_base + j] = (out_r << 11) | (out_g << 5) | out_b

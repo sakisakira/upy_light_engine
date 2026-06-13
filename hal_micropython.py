@@ -105,11 +105,11 @@ class Framebuffer(framebuf.FrameBuffer):
                 dg = (dst_val >> 5) & 63
                 db = dst_val & 31
                 
-                # ブレンド
-                inv_a = 15 - a
-                out_r = (sr * a + dr * inv_a) // 15
-                out_g = (sg * a + dg * inv_a) // 15
-                out_b = (sb * a + db * inv_a) // 15
+                # ブレンド (割り算 // 15 の代わりに 16-a と >> 4 を使って高速化)
+                inv_a = 16 - a
+                out_r = (sr * a + dr * inv_a) >> 4
+                out_g = (sg * a + dg * inv_a) >> 4
+                out_b = (sb * a + db * inv_a) >> 4
                 
                 dst[dst_idx] = (out_r << 11) | (out_g << 5) | out_b
 
