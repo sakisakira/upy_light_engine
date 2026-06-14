@@ -1,4 +1,4 @@
-import hal
+import hal_framebuffer as hal
 
 # テスト用のARGB4444スプライト（円形の半透明グラデーション）を生成
 def create_test_sprite(width, height):
