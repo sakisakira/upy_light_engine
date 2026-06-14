@@ -35,7 +35,7 @@ dy = 2
 sprite = None
 score_font = None
 score_font_half = None
-score_font_quarter = None
+score_font_6px = None
 
 def update():
     global x, y, dx, dy
@@ -88,17 +88,17 @@ def draw():
         font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font)
     if score_font_half:
         font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half)
-    if score_font_quarter:
+    if score_font_6px:
         # Test measure_text and spacing options
-        text_str = "SCORE 1234 (25%)"
-        spacing_val = -2
-        w, h = font_lib.measure_text(text_str, score_font_quarter, spacing=spacing_val)
+        text_str = "SCORE 1234 (6PX PIXEL FONT)"
+        spacing_val = 1
+        w, h = font_lib.measure_text(text_str, score_font_6px, spacing=spacing_val)
         
         # Draw a dark gray background rectangle exactly matching the text bounds
         fb.screen.rect(80, 80, w, h, fb.color(50, 50, 50))
         
         # Draw the text on top
-        font_lib.text(fb.screen, 80, 80, text_str, score_font_quarter, spacing=spacing_val)
+        font_lib.text(fb.screen, 80, 80, text_str, score_font_6px, spacing=spacing_val)
 
 if __name__ == "__main__":
     try:
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     try:
         score_font = font_lib.Font("fonts/score_font.afnt")
         score_font_half = font_lib.Font("fonts/score_font_half.afnt")
-        score_font_quarter = font_lib.Font("fonts/score_font_quarter.afnt")
+        score_font_6px = font_lib.Font("fonts/test_6px_font.afnt")
     except Exception as e:
         print("Could not load font:", e)
         
