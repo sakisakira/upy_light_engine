@@ -94,7 +94,11 @@ def draw():
         font_lib.text(fb.screen, 80, 80, text_str, score_font_quarter, spacing=spacing_val)
 
 if __name__ == "__main__":
-    sprite = create_test_sprite(32, 32)
+    try:
+        sprite = fb.Image.load("images/test_sprite.uimg")
+    except Exception as e:
+        print(f"Failed to load uimg: {e}")
+        sprite = create_test_sprite(32, 32)
     
     import hal.font as font_lib
     try:

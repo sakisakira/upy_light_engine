@@ -18,6 +18,20 @@ class Image:
         else:
             self.buffer = buffer
 
+    @classmethod
+    def load(cls, filename):
+        try:
+            import struct
+        except ImportError:
+            import ustruct as struct
+        with open(filename, "rb") as f:
+            header = f.read(10)
+            if header[:4] != b"UIMG":
+                raise ValueError("Invalid UIMG magic")
+            width, height = struct.unpack("<HH", header[6:10])
+            data = bytearray(f.read(width * height * 2))
+        return cls(width, height, data)
+
 class Framebuffer(framebuf.FrameBuffer):
     """
     Screen buffer in RGB565 format
