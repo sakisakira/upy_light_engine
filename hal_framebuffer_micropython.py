@@ -34,8 +34,29 @@ class Framebuffer(framebuf.FrameBuffer):
         # RGB565フォーマットとして親クラスを初期化
         super().__init__(self.buffer, self.width, self.height, framebuf.RGB565)
 
+    def _col4444_to_565(self, col):
+        r = (col >> 8) & 15
+        g = (col >> 4) & 15
+        b = col & 15
+        return (((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3))
+
     def clear(self, col=0):
-        self.fill(col)
+        self.fill_565(col)
+
+    def fill_565(self, col):
+        super().fill(col)
+        
+    def fill(self, col):
+        self.fill_565(self._col4444_to_565(col))
+
+    def rect_565(self, x, y, w, h, col, is_filled=True):
+        if is_filled:
+            self.fill_rect(x, y, w, h, col)
+        else:
+            super().rect(x, y, w, h, col)
+
+    def rect(self, x, y, w, h, col, is_filled=True):
+        self.rect_565(x, y, w, h, self._col4444_to_565(col), is_filled)
 
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
         """

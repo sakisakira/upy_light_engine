@@ -45,19 +45,14 @@ def update():
         dy = -dy
 
 def draw():
-    # 背景を暗い青 (RGB565: 0x0010 くらい) でクリア
-    hal.screen.clear(0x0010)
+    # 背景を暗い青 (ARGB4444: A=15, R=0, G=0, B=2) で塗りつぶす
+    hal.screen.fill(0xF002)
     
     # 複数の矩形を描画して、アルファブレンドが機能しているか確認しやすくする
     for i in range(5):
-        # hal.screen._mv に直接四角を描く簡略処理
-        # ※本来のPyxelなら rect() などを実装して使います
         bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40
-        bcol = 0xF800 # 赤
-        for py in range(by, by+bh):
-            for px in range(bx, bx+bw):
-                if 0 <= px < 240 and 0 <= py < 135:
-                    hal.screen._mv[py * 240 + px] = bcol
+        bcol = 0xFF00 # 不透明な赤 (A=15, R=15, G=0, B=0)
+        hal.screen.rect(bx, by, bw, bh, bcol)
 
     # スプライトを合成
     hal.screen.blt(x, y, sprite, 0, 0, 32, 32)

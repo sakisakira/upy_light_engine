@@ -28,10 +28,50 @@ class Framebuffer:
             self.buffer = buffer
         self._mv = memoryview(self.buffer).cast('H')
 
+    def _col4444_to_565(self, col):
+        r = (col >> 8) & 15
+        g = (col >> 4) & 15
+        b = col & 15
+        return (((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3))
+
     def clear(self, col=0):
-        """画面を特定の色(RGB565)で塗りつぶす"""
+        # 互換性のため残す(RGB565入力)
+        self.fill_565(col)
+
+    def fill_565(self, col):
         for i in range(self.width * self.height):
             self._mv[i] = col
+
+    def fill(self, col):
+        """画面を特定の色(ARGB4444)で塗りつぶす"""
+        self.fill_565(self._col4444_to_565(col))
+
+    def rect_565(self, x, y, w, h, col, is_filled=True):
+        start_x = max(0, x)
+        start_y = max(0, y)
+        end_x = min(self.width, x + w)
+        end_y = min(self.height, y + h)
+        if start_x >= end_x or start_y >= end_y:
+            return
+            
+        dst_w = self.width
+        mv = self._mv
+        if is_filled:
+            for py in range(start_y, end_y):
+                idx = py * dst_w + start_x
+                for px in range(end_x - start_x):
+                    mv[idx + px] = col
+        else:
+            for px in range(start_x, end_x):
+                mv[start_y * dst_w + px] = col
+                mv[(end_y - 1) * dst_w + px] = col
+            for py in range(start_y, end_y):
+                mv[py * dst_w + start_x] = col
+                mv[py * dst_w + end_x - 1] = col
+
+    def rect(self, x, y, w, h, col, is_filled=True):
+        """矩形を描画する (ARGB4444)"""
+        self.rect_565(x, y, w, h, self._col4444_to_565(col), is_filled)
 
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
         """
