@@ -1,4 +1,5 @@
-import hal.framebuffer as fb
+import framebuffer as fb
+from image import Image
 
 # Generate a test ARGB4444 sprite (semi-transparent circular gradient)
 def create_test_sprite(width, height):
@@ -95,7 +96,7 @@ def draw():
 
 if __name__ == "__main__":
     try:
-        sprite = fb.Image.load("images/test_sprite.uimg")
+        sprite = Image.load("images/test_sprite.uimg")
     except Exception as e:
         print(f"Failed to load uimg: {e}")
         sprite = create_test_sprite(32, 32)

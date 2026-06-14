@@ -1,9 +1,9 @@
 import sys
 
 if sys.implementation.name == 'micropython':
-    from .framebuffer_micropython import *
+    from hal.framebuffer_micropython import Framebuffer, screen, run
 else:
-    from .framebuffer_cpython import *
+    from hal.framebuffer_cpython import Framebuffer, screen, run
 
 def color(r, g, b, a=255):
     """

@@ -2,31 +2,6 @@ import time
 import tkinter as tk
 from PIL import Image as PILImage, ImageTk
 
-class Image:
-    """
-    Class holding image (sprite) data in ARGB4444 format
-    """
-    def __init__(self, width, height, buffer=None):
-        self.width = width
-        self.height = height
-        self.format = "ARGB4444"
-        if buffer is None:
-            self.buffer = bytearray(width * height * 2)
-        else:
-            self.buffer = buffer
-        self._mv = memoryview(self.buffer).cast('H')
-
-    @classmethod
-    def load(cls, filename):
-        import struct
-        with open(filename, "rb") as f:
-            header = f.read(10)
-            if header[:4] != b"UIMG":
-                raise ValueError("Invalid UIMG magic")
-            # header[4] is version, header[5] is format (1=ARGB4444)
-            width, height = struct.unpack("<HH", header[6:10])
-            data = bytearray(f.read(width * height * 2))
-        return cls(width, height, data)
 
 class Framebuffer:
     def __init__(self, width, height, buffer=None):

@@ -1,9 +1,6 @@
 import sys
 
-if sys.implementation.name == 'micropython':
-    from .framebuffer_micropython import Image
-else:
-    from .framebuffer_cpython import Image
+from image import Image
 
 class Font:
     def __init__(self, filepath):
