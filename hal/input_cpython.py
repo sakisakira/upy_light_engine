@@ -1,4 +1,4 @@
-from .input import *
+from constants import *
 
 _key_mapping = {
     KEY_UP: ['Up'],

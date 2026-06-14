@@ -1,4 +1,3 @@
-from .input import *
 
 def set_key_mapping(key_const, key_names):
     """Dummy for MicroPython."""

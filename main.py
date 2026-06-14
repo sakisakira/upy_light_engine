@@ -39,7 +39,7 @@ score_font_quarter = None
 
 def update():
     global x, y, dx, dy
-    import hal.input as inp
+    import input as inp
     
     if inp.button(inp.KEY_LEFT):
         x -= 2
@@ -57,9 +57,15 @@ def update():
     if y >= 135 - 32: y = 135 - 32
 
 def draw():
-    # Fill background with dark blue (RGB: 0, 0, 136)
-    fb.screen.fill(fb.color(0, 0, 136))
-    
+    import input as inp
+    # Fill background depending on button press
+    if inp.button(inp.KEY_A):
+        fb.screen.fill(fb.color(136, 0, 0)) # Red for A (Z key)
+    elif inp.button(inp.KEY_B):
+        fb.screen.fill(fb.color(0, 136, 0)) # Green for B (X key)
+    else:
+        fb.screen.fill(fb.color(0, 0, 136)) # Default dark blue
+
     # Draw multiple rectangles to easily check if alpha blending works
     for i in range(5):
         bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40

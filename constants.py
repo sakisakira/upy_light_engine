@@ -1,5 +1,3 @@
-import sys
-
 # Key constants
 KEY_UP = 1
 KEY_DOWN = 2
@@ -23,8 +21,3 @@ GAMEPAD1_BUTTON_X = KEY_X
 GAMEPAD1_BUTTON_Y = KEY_Y
 GAMEPAD1_BUTTON_START = KEY_START
 GAMEPAD1_BUTTON_BACK = KEY_SELECT
-
-if sys.implementation.name == 'micropython':
-    from .input_micropython import *
-else:
-    from .input_cpython import *
