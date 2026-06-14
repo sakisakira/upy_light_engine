@@ -1,4 +1,4 @@
-import hal_framebuffer as hal
+import hal_framebuffer as fb
 
 # テスト用のARGB4444スプライト（円形の半透明グラデーション）を生成
 def create_test_sprite(width, height):
@@ -24,7 +24,7 @@ def create_test_sprite(width, height):
             mv[y * width + x] = (a << 12) | (r << 8) | (g << 4) | b
             
     # スプライトデータのコンテナとして Image クラスを使用
-    return hal.Image(width, height, buf)
+    return fb.Image(width, height, buf)
 
 # --- ゲームの状態 ---
 x = 100
@@ -45,19 +45,19 @@ def update():
         dy = -dy
 
 def draw():
-    # 背景を暗い青 (ARGB4444: A=15, R=0, G=0, B=2) で塗りつぶす
-    hal.screen.fill(0xF002)
+    # 背景を暗い青 (RGB: 0, 0, 136) で塗りつぶす
+    fb.screen.fill(fb.color(0, 0, 136))
     
     # 複数の矩形を描画して、アルファブレンドが機能しているか確認しやすくする
     for i in range(5):
         bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40
-        bcol = 0xFF00 # 不透明な赤 (A=15, R=15, G=0, B=0)
-        hal.screen.rect(bx, by, bw, bh, bcol)
+        bcol = fb.color(255, 0, 0) # 不透明な赤
+        fb.screen.rect(bx, by, bw, bh, bcol)
 
     # スプライトを合成
-    hal.screen.blt(x, y, sprite, 0, 0, 32, 32)
+    fb.screen.blt(x, y, sprite, 0, 0, 32, 32)
 
 if __name__ == "__main__":
     sprite = create_test_sprite(32, 32)
     # 60FPSでゲームループを開始
-    hal.run(update, draw, fps=60)
+    fb.run(update, draw, fps=60)
