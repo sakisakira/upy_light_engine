@@ -179,11 +179,30 @@ def _tick():
         out[i*3+2] = (b << 3) | (b >> 2)
         
     img = PILImage.frombytes("RGB", (w, h), bytes(out))
-    # Scale up by 2x for easier viewing on PC
-    img = img.resize((w * 2, h * 2), PILImage.NEAREST)
     
+    # Dynamic scaling while preserving aspect ratio
+    cw = _canvas.winfo_width()
+    ch = _canvas.winfo_height()
+    
+    if cw > 1 and ch > 1:
+        # Calculate max scale to fit the canvas (letterboxing)
+        scale = min(cw / w, ch / h)
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        offset_x = (cw - new_w) // 2
+        offset_y = (ch - new_h) // 2
+    else:
+        # Fallback to 2x scale before the window is fully initialized
+        new_w = w * 2
+        new_h = h * 2
+        offset_x = 0
+        offset_y = 0
+        
+    img = img.resize((new_w, new_h), PILImage.NEAREST)
     _img_tk = ImageTk.PhotoImage(image=img)
-    _canvas.create_image(0, 0, anchor=tk.NW, image=_img_tk)
+    
+    _canvas.delete("all")
+    _canvas.create_image(offset_x, offset_y, anchor=tk.NW, image=_img_tk)
         
     _root.after(1000 // _target_fps, _tick)
 
@@ -198,8 +217,8 @@ def run(update, draw, fps=30):
     _root = tk.Tk()
     _root.title("Cardputer Pyxel HAL (CPython)")
     # Canvas size is doubled for easier viewing
-    _canvas = tk.Canvas(_root, width=240*2, height=135*2, bg='black')
-    _canvas.pack()
+    _canvas = tk.Canvas(_root, width=240*2, height=135*2, bg='black', highlightthickness=0)
+    _canvas.pack(fill=tk.BOTH, expand=True)
     
     from . import input_cpython
     input_cpython.init(_root, _canvas)
