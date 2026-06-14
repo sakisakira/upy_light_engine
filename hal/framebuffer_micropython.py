@@ -58,6 +58,17 @@ class Framebuffer(framebuf.FrameBuffer):
     def rect(self, x, y, w, h, col, is_filled=True):
         self.rect_565(x, y, w, h, self._col4444_to_565(col), is_filled)
 
+    def pset(self, x, y, col):
+        super().pixel(x, y, self._col4444_to_565(col))
+
+    def line(self, x1, y1, x2, y2, col):
+        if x1 == x2:
+            super().vline(x1, min(y1, y2), abs(y2 - y1) + 1, self._col4444_to_565(col))
+        elif y1 == y2:
+            super().hline(min(x1, x2), y1, abs(x2 - x1) + 1, self._col4444_to_565(col))
+        else:
+            return
+
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
         """
         Switch blending process based on img format

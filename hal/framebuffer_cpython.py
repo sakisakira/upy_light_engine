@@ -73,6 +73,20 @@ class Framebuffer:
         """Draw a rectangle (ARGB4444)"""
         self.rect_565(x, y, w, h, self._col4444_to_565(col), is_filled)
 
+    def pset(self, x, y, col):
+        """Draw a pixel (ARGB4444)"""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self._mv[y * self.width + x] = self._col4444_to_565(col)
+
+    def line(self, x1, y1, x2, y2, col):
+        """Draw a vertical or horizontal line (ARGB4444)"""
+        if x1 == x2:
+            self.rect(x1, min(y1, y2), 1, abs(y2 - y1) + 1, col)
+        elif y1 == y2:
+            self.rect(min(x1, x2), y1, abs(x2 - x1) + 1, 1, col)
+        else:
+            raise NotImplementedError("Diagonal line drawing is not supported yet.")
+
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
         """
         img: Image(ARGB4444) or Framebuffer(RGB565)
@@ -199,6 +213,9 @@ def run(update, draw, fps=30):
     # Canvas size is doubled for easier viewing
     _canvas = tk.Canvas(_root, width=240*2, height=135*2, bg='black')
     _canvas.pack()
+    
+    from . import input_cpython
+    input_cpython.init(_root, _canvas)
     
     _tick()
     _root.mainloop()

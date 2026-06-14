@@ -32,17 +32,28 @@ y = 50
 dx = 2
 dy = 2
 sprite = None
+score_font = None
+score_font_half = None
+score_font_quarter = None
 
 def update():
     global x, y, dx, dy
-    x += dx
-    y += dy
+    import hal.input as inp
     
-    # Bounce at screen edges
-    if x <= 0 or x >= 240 - 32:
-        dx = -dx
-    if y <= 0 or y >= 135 - 32:
-        dy = -dy
+    if inp.button(inp.KEY_LEFT):
+        x -= 2
+    if inp.button(inp.KEY_RIGHT):
+        x += 2
+    if inp.button(inp.KEY_UP):
+        y -= 2
+    if inp.button(inp.KEY_DOWN):
+        y += 2
+    
+    # Restrict to screen edges
+    if x <= 0: x = 0
+    if x >= 240 - 32: x = 240 - 32
+    if y <= 0: y = 0
+    if y >= 135 - 32: y = 135 - 32
 
 def draw():
     # Fill background with dark blue (RGB: 0, 0, 136)
@@ -57,7 +68,41 @@ def draw():
     # Blend the sprite
     fb.screen.blt(x, y, sprite, 0, 0, 32, 32)
 
+    # Test pset
+    fb.screen.pset(10, 10, fb.color(255, 255, 255))
+    
+    # Test line primitives (with different colors and positions so they don't overlap text)
+    fb.screen.line(10, 110, 100, 110, fb.color(255, 0, 255)) # horizontal (Magenta)
+    fb.screen.line(110, 80, 110, 120, fb.color(0, 255, 255)) # vertical (Cyan)
+
+    # Test text drawing
+    import hal.font as font_lib
+    if score_font:
+        font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font)
+    if score_font_half:
+        font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half)
+    if score_font_quarter:
+        # Test measure_text and spacing options
+        text_str = "SCORE 1234 (25%)"
+        spacing_val = -2
+        w, h = font_lib.measure_text(text_str, score_font_quarter, spacing=spacing_val)
+        
+        # Draw a dark gray background rectangle exactly matching the text bounds
+        fb.screen.rect(80, 80, w, h, fb.color(50, 50, 50))
+        
+        # Draw the text on top
+        font_lib.text(fb.screen, 80, 80, text_str, score_font_quarter, spacing=spacing_val)
+
 if __name__ == "__main__":
     sprite = create_test_sprite(32, 32)
+    
+    import hal.font as font_lib
+    try:
+        score_font = font_lib.Font("fonts/score_font.afnt")
+        score_font_half = font_lib.Font("fonts/score_font_half.afnt")
+        score_font_quarter = font_lib.Font("fonts/score_font_quarter.afnt")
+    except Exception as e:
+        print("Could not load font:", e)
+        
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)

@@ -20,6 +20,15 @@ class DummyFramebuf:
         def rect(self, x, y, w, h, col):
             pass
 
+        def pixel(self, x, y, col=None):
+            pass
+
+        def hline(self, x, y, w, col):
+            pass
+
+        def vline(self, x, y, h, col):
+            pass
+
 sys.modules['framebuf'] = DummyFramebuf()
 
 # Mock micropython module and decorators

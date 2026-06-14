@@ -1,0 +1,30 @@
+import sys
+
+# Key constants
+KEY_UP = 1
+KEY_DOWN = 2
+KEY_LEFT = 3
+KEY_RIGHT = 4
+KEY_A = 5
+KEY_B = 6
+KEY_X = 7
+KEY_Y = 8
+KEY_START = 9
+KEY_SELECT = 10
+
+# Gamepad aliases
+GAMEPAD1_BUTTON_DPAD_UP = KEY_UP
+GAMEPAD1_BUTTON_DPAD_DOWN = KEY_DOWN
+GAMEPAD1_BUTTON_DPAD_LEFT = KEY_LEFT
+GAMEPAD1_BUTTON_DPAD_RIGHT = KEY_RIGHT
+GAMEPAD1_BUTTON_A = KEY_A
+GAMEPAD1_BUTTON_B = KEY_B
+GAMEPAD1_BUTTON_X = KEY_X
+GAMEPAD1_BUTTON_Y = KEY_Y
+GAMEPAD1_BUTTON_START = KEY_START
+GAMEPAD1_BUTTON_BACK = KEY_SELECT
+
+if sys.implementation.name == 'micropython':
+    from .input_micropython import *
+else:
+    from .input_cpython import *
