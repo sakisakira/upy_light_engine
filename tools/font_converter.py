@@ -10,6 +10,23 @@ except ImportError:
     sys.exit(1)
 
 def convert_png(png_path, out_path, colkey=None):
+    """
+    Convert a grid-based PNG image into an AFNT format font.
+    
+    Expected PNG Layout:
+    - 16 columns x 6 rows (96 cells total)
+    - Characters are mapped from ASCII 0x20 (Space) to 0x7E (~), total 95 characters.
+    - Each cell size is automatically calculated as (img.width // 16) x (img.height // 6).
+    
+    The 6 lines of characters should be arranged exactly like this:
+    Row 1:  !"#$%&'()*+,-./
+    Row 2: 0123456789:;<=>?
+    Row 3: @ABCDEFGHIJKLMNO
+    Row 4: PQRSTUVWXYZ[\\]^_
+    Row 5: `abcdefghijklmno
+    Row 6: pqrstuvwxyz{|}~
+    (The very last cell at the end of Row 6 is unused)
+    """
     try:
         img = Image.open(png_path).convert("RGBA")
     except Exception as e:
