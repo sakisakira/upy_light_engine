@@ -18,7 +18,7 @@ class TestFontConverter(unittest.TestCase):
             tools.font_converter.convert_font("non_existent_font.ttf", afnt_path, size=10)
             
             self.assertTrue(os.path.exists(afnt_path))
-            preview_path = afnt_path.replace('.afnt', '_preview.png')
+            preview_path = afnt_path.replace('.afnt', '.png')
             self.assertTrue(os.path.exists(preview_path))
             
             # 2. Test PNG conversion using the generated preview PNG
@@ -35,8 +35,8 @@ class TestFontConverter(unittest.TestCase):
                 self.assertEqual(header1, header2)
                 
         finally:
-            for p in [afnt_path, afnt_path.replace('.afnt', '_preview.png'), 
-                      "test_from_png.afnt", "test_from_png_preview.png"]:
+            for p in [afnt_path, afnt_path.replace('.afnt', '.png'), 
+                      "test_from_png.afnt", "test_from_png.png"]:
                 if os.path.exists(p):
                     os.remove(p)
 
@@ -54,7 +54,7 @@ class TestFontConverter(unittest.TestCase):
             tools.font_converter.convert_png(png_path, out_path, colkey=(0, 0, 0))
             self.assertTrue(os.path.exists(out_path))
         finally:
-            for p in [png_path, out_path, out_path.replace('.afnt', '_preview.png')]:
+            for p in [png_path, out_path, out_path.replace('.afnt', '.png')]:
                 if os.path.exists(p):
                     os.remove(p)
 

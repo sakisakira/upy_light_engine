@@ -5,7 +5,7 @@ import sys
 import tests.mock_micropython
 
 # Now we can import the modules safely
-from hal import framebuffer
+import framebuffer
 from hal import framebuffer_cpython
 from hal import framebuffer_micropython
 
