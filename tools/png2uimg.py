@@ -3,14 +3,9 @@ import struct
 import sys
 from PIL import Image
 
-def main():
-    parser = argparse.ArgumentParser(description="Convert PNG to UIMG (ARGB4444) format.")
-    parser.add_argument("input", help="Input PNG file")
-    parser.add_argument("output", help="Output UIMG file")
-    args = parser.parse_args()
-
+def convert_png_to_uimg(png_path, uimg_path):
     try:
-        img = Image.open(args.input).convert("RGBA")
+        img = Image.open(png_path).convert("RGBA")
     except Exception as e:
         print(f"Error opening image: {e}")
         sys.exit(1)
@@ -48,11 +43,19 @@ def main():
             # Store as Little Endian 16-bit
             data.extend(struct.pack("<H", val))
 
-    with open(args.output, "wb") as f:
+    with open(uimg_path, "wb") as f:
         f.write(header)
         f.write(data)
 
-    print(f"Converted {args.input} to {args.output} ({width}x{height})")
+    print(f"Converted {png_path} to {uimg_path} ({width}x{height})")
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert PNG to UIMG (ARGB4444) format.")
+    parser.add_argument("input", help="Input PNG file")
+    parser.add_argument("output", help="Output UIMG file")
+    args = parser.parse_args()
+
+    convert_png_to_uimg(args.input, args.output)
 
 if __name__ == "__main__":
     main()

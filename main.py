@@ -1,14 +1,38 @@
 import framebuffer as fb
 from image import Image
 
-# Generate a test ARGB4444 sprite (semi-transparent circular gradient)
+# Generate a test ARGB4444 sprite (circle: top red, bottom blue)
 def create_test_sprite(width, height):
+    buf = bytearray(width * height * 2)
+    mv = memoryview(buf).cast('H')
+    
+    cx = width / 2.0
+    cy = height / 2.0
+    radius_sq = (width / 2.0) ** 2
+    
+    for y in range(height):
+        for x in range(width):
+            if (x - cx)**2 + (y - cy)**2 <= radius_sq:
+                if y < cy:
+                    # Red (a=15, r=15, g=0, b=0)
+                    mv[y * width + x] = (15 << 12) | (15 << 8) | (0 << 4) | 0
+                else:
+                    # Blue (a=15, r=0, g=0, b=15)
+                    mv[y * width + x] = (15 << 12) | (0 << 8) | (0 << 4) | 15
+            else:
+                # Transparent
+                mv[y * width + x] = 0
+            
+    # Use Image class as a container for sprite data
+    return Image(width, height, buf)
+
+# Generate a test ARGB4444 sprite (semi-transparent circular cyan gradient)
+def create_gradient_sprite(width, height):
     buf = bytearray(width * height * 2)
     mv = memoryview(buf).cast('H')
     
     for y in range(height):
         for x in range(width):
-            # Calculate alpha value based on distance from center (opaque at center, transparent at edges)
             cx = width / 2.0
             cy = height / 2.0
             dist = ((x - cx)**2 + (y - cy)**2)**0.5
@@ -16,16 +40,13 @@ def create_test_sprite(width, height):
             
             a = max(0, min(15, int(15 * (1 - dist / max_dist))))
             
-            # Set color to Cyan (R:0, G:15, B:15)
             r = 0
             g = 15
             b = 15
             
-            # Pack into ARGB4444 format
             mv[y * width + x] = (a << 12) | (r << 8) | (g << 4) | b
             
-    # Use Image class as a container for sprite data
-    return fb.Image(width, height, buf)
+    return Image(width, height, buf)
 
 # --- Game State ---
 x = 100
@@ -33,6 +54,7 @@ y = 50
 dx = 2
 dy = 2
 sprite = None
+sprite_gradient = None
 score_font = None
 score_font_half = None
 score_font_6px = None
@@ -73,7 +95,10 @@ def draw():
         fb.screen.rect(bx, by, bw, bh, bcol)
 
     # Blend the sprite
-    fb.screen.blt(x, y, sprite, 0, 0, 32, 32)
+    if sprite:
+        fb.screen.blt(x, y, sprite, 0, 0, sprite.width, sprite.height)
+    if sprite_gradient:
+        fb.screen.blt(x - 40, y, sprite_gradient, 0, 0, sprite_gradient.width, sprite_gradient.height)
 
     # Test pset
     fb.screen.pset(10, 10, fb.color(255, 255, 255))
@@ -105,7 +130,9 @@ if __name__ == "__main__":
         sprite = Image.load("images/test_sprite.uimg")
     except Exception as e:
         print(f"Failed to load uimg: {e}")
-        sprite = create_test_sprite(32, 32)
+        sprite = create_test_sprite(16, 16)
+        
+    sprite_gradient = create_gradient_sprite(32, 32)
     
     import hal.font as font_lib
     try:
