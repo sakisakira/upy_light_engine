@@ -63,13 +63,13 @@ def update():
     global x, y, dx, dy
     import input as inp
     
-    if inp.button(inp.KEY_LEFT):
+    if inp.button(inp.Button_Left):
         x -= 2
-    if inp.button(inp.KEY_RIGHT):
+    if inp.button(inp.Button_Right):
         x += 2
-    if inp.button(inp.KEY_UP):
+    if inp.button(inp.Button_Up):
         y -= 2
-    if inp.button(inp.KEY_DOWN):
+    if inp.button(inp.Button_Down):
         y += 2
     
     # Restrict to screen edges
@@ -81,10 +81,10 @@ def update():
 def draw():
     import input as inp
     # Fill background depending on button press
-    if inp.button(inp.KEY_A):
-        fb.screen.fill(fb.color(136, 0, 0)) # Red for A (Z key)
-    elif inp.button(inp.KEY_B):
-        fb.screen.fill(fb.color(0, 136, 0)) # Green for B (X key)
+    if inp.button(inp.Button_A):
+        fb.screen.fill(fb.color(136, 0, 0)) # Red for A
+    elif inp.button(inp.Button_B):
+        fb.screen.fill(fb.color(0, 136, 0)) # Green for B
     else:
         fb.screen.fill(fb.color(0, 0, 136)) # Default dark blue
 

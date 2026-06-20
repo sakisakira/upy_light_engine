@@ -142,3 +142,20 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
   - テスト用の 8x8 RGBA PNG画像を自動生成して変換を実行し、`image.Image.load()` で正しく `ARGB4444` フォーマットとしてピクセル値が読み込めるかをアサート検証する単体テストを追加しました。
   - 要望に基づき、テスト中の `tearDown` 処理で中間生成物の `.uimg` はクリーンアップする一方、生成された入力元画像 `test_png2uimg_input.png` はそのまま残して確認できるように変更しました。
 
+---
+
+## 2026-06-21: Cardputer ADV キーボード (TCA8418) の対応と物理キー・論理ボタンの分離
+
+**【指摘・要望内容】**
+> - Cardputer ADVに搭載されているTCA8418マトリクスキーボードから入力を取れるようにしたい。
+> - `Key_Up`, `Key_Down` のような物理キーと、`Button_Up`, `Button_A` のようなゲームの論理ボタンを分けて定義したい。プレフィックスは `KEY_` ではなく `Key_`、`Button_` が好みで、定数は `enum.auto()` で綺麗に定義したい。
+> - PC環境ではWASDとN, Mキー、Cardputer環境ではWASDとSpace, Enterキーという風に環境ごとの初期マッピングを設定したい。
+> - 抽象層（`input.py`）ではなく、HAL層に環境ごとのマッピング処理を閉じ込めたい。
+
+**【設計判断と対応】**
+- **TCA8418 マトリクススキャナ実装 (`tools/test_tca8418.py`, `hal/input_micropython.py`)**:
+  実機用のテストスクリプトを作成して物理配線を調査し、単純な連番配線ではないこと（Space=68, Enter=67 等）を解明。I2C通信で取得した生のマトリクスコードから物理キー定数へ変換するマッピングテーブルをHAL内に実装した。
+- **定数のリファクタリング (`constants.py`)**:
+  物理キー定数 (`Key_W`, `Key_Space`等) と論理ボタン定数 (`Button_Up`, `Button_A`等) を分離し、`enum.IntEnum` と `auto()` を用いてクリーンに再定義した。標準で `enum` モジュールが存在しない MicroPython 環境でも動作するよう、`try-except` によるフォールバック処理を追加した。
+- **抽象層とHALの責務分離 (`input.py`, `hal/input_*.py`)**:
+  `input.py` にあったマッピング処理を削除し、各プラットフォーム固有の `_button_to_key` マッピングを `hal/input_cpython.py` および `hal/input_micropython.py` の内部に移動させることで、プラットフォーム依存コードをHAL内に完全に隠蔽する設計とした。

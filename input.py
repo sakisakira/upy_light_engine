@@ -1,5 +1,4 @@
 import sys
-
 from constants import *
 
 if sys.implementation.name == 'micropython':

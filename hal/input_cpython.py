@@ -1,43 +1,52 @@
 from constants import *
 
-_key_mapping = {
-    KEY_UP: ['Up'],
-    KEY_DOWN: ['Down'],
-    KEY_LEFT: ['Left'],
-    KEY_RIGHT: ['Right'],
-    KEY_A: ['z', 'Z'],
-    KEY_B: ['x', 'X'],
-    KEY_X: ['a', 'A'],
-    KEY_Y: ['s', 'S'],
-    KEY_START: ['Return'],
-    KEY_SELECT: ['Shift_L', 'Shift_R']
+# PC Tkinter mapping
+_tk_to_key = {
+    'w': Key_W,
+    'a': Key_A,
+    's': Key_S,
+    'd': Key_D,
+    'n': Key_N,
+    'm': Key_M,
+    'space': Key_Space,
+    'Return': Key_Enter
 }
 
-_key_state = {}
+# PC bindings for logical buttons
+_button_to_key = {
+    Button_Up: Key_W,
+    Button_Down: Key_S,
+    Button_Left: Key_A,
+    Button_Right: Key_D,
+    Button_A: Key_N,
+    Button_B: Key_M
+}
+
+# Current state of physical keys
+_keys_pressed = set()
 
 def set_key_mapping(key_const, key_names):
-    """
-    Override the default key mapping for a specific button.
-    Example: set_key_mapping(KEY_A, ['space', 'z'])
-    """
-    _key_mapping[key_const] = key_names
+    """Not strictly needed since we use fixed physical key mapping, but kept for compatibility."""
+    pass
 
-def _on_key_press(event):
-    _key_state[event.keysym] = True
+def init(root=None, canvas=None):
+    if root is None:
+        return
 
-def _on_key_release(event):
-    if event.keysym in _key_state:
-        _key_state[event.keysym] = False
+    def on_key_press(event):
+        key = _tk_to_key.get(event.keysym.lower() if event.keysym.lower() in _tk_to_key else event.keysym)
+        if key is not None:
+            _keys_pressed.add(key)
+        
+    def on_key_release(event):
+        key = _tk_to_key.get(event.keysym.lower() if event.keysym.lower() in _tk_to_key else event.keysym)
+        if key in _keys_pressed:
+            _keys_pressed.remove(key)
 
-def init(root, canvas):
-    """Initialize input bindings on the given Tkinter root."""
-    root.bind('<KeyPress>', _on_key_press)
-    root.bind('<KeyRelease>', _on_key_release)
+    root.bind('<KeyPress>', on_key_press)
+    root.bind('<KeyRelease>', on_key_release)
 
-def button(key_const):
-    """Check if the given key is currently pressed."""
-    if key_const in _key_mapping:
-        for keysym in _key_mapping[key_const]:
-            if _key_state.get(keysym, False):
-                return True
-    return False
+def button(btn_const):
+    """Check if a logical game button or physical key is pressed."""
+    key_const = _button_to_key.get(btn_const, btn_const)
+    return key_const in _keys_pressed

@@ -175,6 +175,10 @@ def run(update, draw, fps=30):
     """
     import time
     import machine
+    from . import input_micropython
+    
+    # Initialize hardware input
+    input_micropython.init()
     
     # [Implementation Note]
     # SPI driver like ST7789 needs to be initialized here

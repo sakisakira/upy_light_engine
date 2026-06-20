@@ -1,23 +1,56 @@
-# Key constants
-KEY_UP = 1
-KEY_DOWN = 2
-KEY_LEFT = 3
-KEY_RIGHT = 4
-KEY_A = 5
-KEY_B = 6
-KEY_X = 7
-KEY_Y = 8
-KEY_START = 9
-KEY_SELECT = 10
+try:
+    from enum import IntEnum, auto
+except ImportError:
+    # MicroPython fallback if enum is not available
+    class IntEnum:
+        pass
+    _auto_idx = 0
+    def auto():
+        global _auto_idx
+        _auto_idx += 1
+        return _auto_idx
 
-# Gamepad aliases
-GAMEPAD1_BUTTON_DPAD_UP = KEY_UP
-GAMEPAD1_BUTTON_DPAD_DOWN = KEY_DOWN
-GAMEPAD1_BUTTON_DPAD_LEFT = KEY_LEFT
-GAMEPAD1_BUTTON_DPAD_RIGHT = KEY_RIGHT
-GAMEPAD1_BUTTON_A = KEY_A
-GAMEPAD1_BUTTON_B = KEY_B
-GAMEPAD1_BUTTON_X = KEY_X
-GAMEPAD1_BUTTON_Y = KEY_Y
-GAMEPAD1_BUTTON_START = KEY_START
-GAMEPAD1_BUTTON_BACK = KEY_SELECT
+class Key(IntEnum):
+    W = auto()
+    A = auto()
+    S = auto()
+    D = auto()
+    N = auto()
+    M = auto()
+    Space = auto()
+    Enter = auto()
+
+class Button(IntEnum):
+    Up = auto()
+    Down = auto()
+    Left = auto()
+    Right = auto()
+    A = auto()
+    B = auto()
+    X = auto()
+    Y = auto()
+    Start = auto()
+    Select = auto()
+
+# Physical Key Constants
+Key_W = Key.W
+Key_A = Key.A
+Key_S = Key.S
+Key_D = Key.D
+Key_N = Key.N
+Key_M = Key.M
+Key_Space = Key.Space
+Key_Enter = Key.Enter
+
+# Logical Button Constants
+Button_Up = Button.Up
+Button_Down = Button.Down
+Button_Left = Button.Left
+Button_Right = Button.Right
+Button_A = Button.A
+Button_B = Button.B
+Button_X = Button.X
+Button_Y = Button.Y
+Button_Start = Button.Start
+Button_Select = Button.Select
+
