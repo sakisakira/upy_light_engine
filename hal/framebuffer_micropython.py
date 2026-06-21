@@ -185,8 +185,15 @@ def run(update, draw, fps=30):
     input_micropython.init()
     logger.debug("input_micropython initialized.")
     
-    # [Implementation Note]
-    # SPI driver like ST7789 needs to be initialized here
+    # Initialize Display
+    from . import st7789
+    logger.debug("Initializing ST7789 display...")
+    try:
+        display = st7789.ST7789()
+        logger.debug("ST7789 initialized.")
+    except Exception as e:
+        logger.error(f"Failed to initialize ST7789: {e}")
+        display = None
     
     frame_count = 0
     
@@ -204,8 +211,9 @@ def run(update, draw, fps=30):
         if frame_count == 0:
             logger.debug("draw() OK")
         
-        # Dummy screen reflection via SPI transfer
-        # 例: display.show(screen.buffer)
+        # Reflect drawn content to ST7789 display
+        if display:
+            display.show(screen.buffer)
         
         frame_count += 1
         if frame_count % 60 == 0:
