@@ -1,7 +1,11 @@
 import unittest
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+except AttributeError:
+    sys.path.insert(0, '..')
+    sys.path.insert(0, '/')
 import mml_parser
 
 class TestMMLParser(unittest.TestCase):
