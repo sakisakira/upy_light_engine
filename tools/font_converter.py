@@ -1,6 +1,7 @@
 import sys
 import argparse
 import os
+import struct
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -90,7 +91,7 @@ def convert_png(png_path, out_path, colkey=None, color=None, shadow_color=None, 
     print(f"Converted PNG to AFNT: {out_path}")
 
 def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
-                 shadow_color=None, shadow_offset=(1, 1), bold=False, no_aa=False):
+                 shadow_color=None, shadow_offset=(1, 1), bold=False, no_aa=False, chars=None):
     try:
         font = ImageFont.truetype(font_path, size)
     except IOError:
@@ -102,12 +103,30 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
             print(f"Error loading font: {e}")
             sys.exit(1)
 
+    # If chars is not provided, use default ASCII 0x20-0x7E
+    if chars is None:
+        char_list = [chr(0x20 + i) for i in range(95)]
+        is_v2 = False
+    else:
+        # If chars is a file path, read it. Otherwise treat it as a string of chars.
+        if os.path.exists(chars):
+            with open(chars, 'r', encoding='utf-8') as f:
+                chars_str = f.read()
+        else:
+            chars_str = chars
+            
+        char_list = sorted(list(set(chars_str)))
+        # Remove control characters like newline
+        char_list = [c for c in char_list if ord(c) >= 0x20]
+        is_v2 = True
+
+    num_chars = len(char_list)
+    
     # Calculate bounding box for the tallest/widest characters
     ascent, descent = font.getmetrics()
     
     char_w = 0
-    for i in range(95):
-        c = chr(0x20 + i)
+    for c in char_list:
         bbox = font.getbbox(c)
         if bbox:
             char_w = max(char_w, bbox[2])
@@ -124,10 +143,9 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
     char_w += padding_x
     char_h = ascent + descent + padding_y
     
-    # We will map ASCII 0x20 to 0x7E (95 characters)
-    # A grid of 16 columns x 6 rows = 96 cells
-    cols = 16
-    rows = 6
+    # A grid of cols x rows
+    cols = min(16, num_chars)
+    rows = (num_chars + cols - 1) // cols
     img_w = char_w * cols
     img_h = char_h * rows
 
@@ -135,10 +153,7 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
     img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    for i in range(95):
-        char_code = 0x20 + i
-        char_str = chr(char_code)
-        
+    for i, char_str in enumerate(char_list):
         col = i % cols
         row = i // cols
         
@@ -174,10 +189,17 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
     print(f"Saved preview to {preview_path} (size: {img_w}x{img_h}, cell: {char_w}x{char_h})")
 
     # Convert to ARGB4444 binary format
-    # Header: "AFNT" (4) + char_w (1) + char_h (1) + cols (1) + rows (1)
     with open(out_path, 'wb') as f:
-        f.write(b"AFNT")
-        f.write(bytes([char_w, char_h, cols, rows]))
+        if is_v2:
+            f.write(b"AFN2")
+            f.write(bytes([char_w, char_h, cols, rows]))
+            f.write(num_chars.to_bytes(2, byteorder='little'))
+            # Write codepoints
+            for c in char_list:
+                f.write(ord(c).to_bytes(2, byteorder='little'))
+        else:
+            f.write(b"AFNT")
+            f.write(bytes([char_w, char_h, cols, rows]))
         
         # Pixel data
         pixels = img.load()
@@ -225,6 +247,7 @@ Row 6: pqrstuvwxyz{|}~
     parser.add_argument("--soffset", type=int, nargs=2, default=(1, 1), metavar=('X', 'Y'), help="Shadow offset")
     parser.add_argument("--no-aa", action="store_true", help="Disable anti-aliasing (useful for small sizes)")
     parser.add_argument("--colkey", type=int, nargs=3, metavar=('R', 'G', 'B'), help="Transparent color key for PNG input (e.g., 0 0 0 for black)")
+    parser.add_argument("--chars", type=str, help="String of characters to include, or path to a text file. If provided, creates AFN2 format.")
     
     if len(sys.argv) == 1:
         parser.print_help()
@@ -241,4 +264,4 @@ Row 6: pqrstuvwxyz{|}~
                     shadow_color=shadow_color, shadow_offset=args.soffset, bold=args.bold)
     else:
         convert_font(args.font, args.out, size=args.size, color=main_color,
-                     shadow_color=shadow_color, shadow_offset=args.soffset, bold=args.bold, no_aa=args.no_aa)
+                     shadow_color=shadow_color, shadow_offset=args.soffset, bold=args.bold, no_aa=args.no_aa, chars=args.chars)

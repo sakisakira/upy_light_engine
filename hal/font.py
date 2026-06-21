@@ -6,7 +6,7 @@ class Font:
     def __init__(self, filepath):
         with open(filepath, 'rb') as f:
             header = f.read(4)
-            if header != b"AFNT":
+            if header not in (b"AFNT", b"AFN2"):
                 raise ValueError(f"Invalid font file format: {filepath}")
             
             meta = f.read(4)
@@ -14,6 +14,14 @@ class Font:
             self.char_h = meta[1]
             self.cols = meta[2]
             self.rows = meta[3]
+            
+            self.char_map = None
+            if header == b"AFN2":
+                num_chars = int.from_bytes(f.read(2), 'little')
+                self.char_map = {}
+                for i in range(num_chars):
+                    cp = int.from_bytes(f.read(2), 'little')
+                    self.char_map[cp] = i
             
             # Read pixel data (ARGB4444)
             pixel_data = bytearray(f.read())
@@ -40,10 +48,12 @@ def measure_text(string, font, spacing=0):
             h += font.char_h
         else:
             code = ord(char)
-            if 0x20 <= code <= 0x7E:
-                # Add character width and spacing, except after the last char, 
-                # but for simplicity we just add it and subtract one spacing at the end of the line
-                current_w += font.char_w + spacing
+            if font.char_map is not None:
+                if code in font.char_map:
+                    current_w += font.char_w + spacing
+            else:
+                if 0x20 <= code <= 0x7E:
+                    current_w += font.char_w + spacing
                 
     if current_w > w:
         w = current_w
@@ -69,8 +79,15 @@ def text(fb, x, y, string, font, spacing=0):
             continue
             
         code = ord(char)
-        if 0x20 <= code <= 0x7E:
-            index = code - 0x20
+        index = -1
+        if font.char_map is not None:
+            if code in font.char_map:
+                index = font.char_map[code]
+        else:
+            if 0x20 <= code <= 0x7E:
+                index = code - 0x20
+                
+        if index >= 0:
             col = index % font.cols
             row = index // font.cols
             

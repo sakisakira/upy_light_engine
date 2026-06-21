@@ -59,6 +59,7 @@ sprite_gradient = None
 score_font = None
 score_font_half = None
 score_font_6px = None
+score_font_16px = None
 
 def update():
     global x, y, dx, dy
@@ -115,16 +116,19 @@ def draw():
     if score_font_half:
         font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half)
     if score_font_6px:
-        # Test measure_text and spacing options
+        # Measure text first
         text_str = "SCORE 1234 (6PX PIXEL FONT)"
-        spacing_val = 1
-        w, h = font_lib.measure_text(text_str, score_font_6px, spacing=spacing_val)
+        w, h = font_lib.measure_text(text_str, score_font_6px)
         
         # Draw a dark gray background rectangle exactly matching the text bounds
         fb.screen.rect(80, 80, w, h, fb.color(50, 50, 50))
+        font_lib.text(fb.screen, 80, 80, text_str, score_font_6px)
         
-        # Draw the text on top
-        font_lib.text(fb.screen, 80, 80, text_str, score_font_6px, spacing=spacing_val)
+    if score_font_16px:
+        text_str_16 = "HELLO 16PX FONT!"
+        w16, h16 = font_lib.measure_text(text_str_16, score_font_16px)
+        fb.screen.rect(10, 100, w16, h16, fb.color(50, 50, 50))
+        font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px)
 
 if __name__ == "__main__":
     import logger
@@ -149,11 +153,13 @@ if __name__ == "__main__":
         # We only load the 6px font (~6KB) to avoid Out Of Memory errors.
         # score_font = font_lib.Font("fonts/score_font.afnt")
         # score_font_half = font_lib.Font("fonts/score_font_half.afnt")
-        logger.debug("test 3: Loading test_6px_font.afnt...")
+        logger.debug("test 3: Loading fonts...")
         score_font_6px = font_lib.Font("fonts/test_6px_font.afnt")
-        logger.debug("test 4: Font loaded.")
+        score_font_16px = font_lib.Font("fonts/test_16px_custom.afnt")
+        logger.debug("test 4: Fonts loaded.")
     except Exception as e:
-        logger.error("Could not load font:", e)
+        import gc
+        logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
         
     logger.debug("test 5: Before fb.run")
     # Start the game loop at 60 FPS
