@@ -159,3 +159,11 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
   物理キー定数 (`Key_W`, `Key_Space`等) と論理ボタン定数 (`Button_Up`, `Button_A`等) を分離し、`enum.IntEnum` と `auto()` を用いてクリーンに再定義した。標準で `enum` モジュールが存在しない MicroPython 環境でも動作するよう、`try-except` によるフォールバック処理を追加した。
 - **抽象層とHALの責務分離 (`input.py`, `hal/input_*.py`)**:
   `input.py` にあったマッピング処理を削除し、各プラットフォーム固有の `_button_to_key` マッピングを `hal/input_cpython.py` および `hal/input_micropython.py` の内部に移動させることで、プラットフォーム依存コードをHAL内に完全に隠蔽する設計とした。
+
+* **TCA8418キーマッピングの実装とハードウェア抽象化 (2026-06-20)**
+  * **指摘・要望**: PC環境とCardputer環境で同じ `main.py` が動くようにしたいが、`input.py` 内に直接TCA8418のキーコードをハードコードするのはプラットフォーム依存になるため美しくない。
+  * **対応**: `constants.py` を作成し、定数を `Key_` (物理キー) と `Button_` (論理ボタン) に分離。`input.py` は単なるルーティング層とし、プラットフォーム固有のキーマッピングは `hal/input_cpython.py` と `hal/input_micropython.py` にカプセル化した。
+
+* **ログ出力制御（ロギングシステム）の実装 (2026-06-21 09:30)**
+  * **指摘・要望**: コンソールログは便利だが、本番時や不要な時に一括で出力をオン・オフできる仕組みが欲しい。
+  * **対応**: MicroPythonのメモリ制約を考慮し、超軽量な `logger.py` モジュールをルートディレクトリに新設。`main.py` や `hal/framebuffer_micropython.py` 内の `print` を `logger.debug` に置き換え、`logger.DEBUG_ENABLED = True / False` だけで全てのデバッグログを制御できるようにした。

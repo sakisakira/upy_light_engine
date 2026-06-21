@@ -127,30 +127,34 @@ def draw():
         font_lib.text(fb.screen, 80, 80, text_str, score_font_6px, spacing=spacing_val)
 
 if __name__ == "__main__":
+    import logger
+    # Set to False to mute all debug logs
+    logger.DEBUG_ENABLED = True
+
     try:
         sprite = Image.load("images/test_sprite.uimg")
     except Exception as e:
-        print(f"Failed to load uimg: {e}")
+        logger.error(f"Failed to load uimg: {e}")
         sprite = create_test_sprite(16, 16)
         
     sprite_gradient = create_gradient_sprite(32, 32)
     
-    print("test 1: Before import hal.font")
+    logger.debug("test 1: Before import hal.font")
 
     import hal.font as font_lib
-    print("test 2: After import hal.font")
+    logger.debug("test 2: After import hal.font")
     
     try:
         # MicroPython on Cardputer has limited heap. score_font.afnt is ~180KB!
         # We only load the 6px font (~6KB) to avoid Out Of Memory errors.
         # score_font = font_lib.Font("fonts/score_font.afnt")
         # score_font_half = font_lib.Font("fonts/score_font_half.afnt")
-        print("test 3: Loading test_6px_font.afnt...")
+        logger.debug("test 3: Loading test_6px_font.afnt...")
         score_font_6px = font_lib.Font("fonts/test_6px_font.afnt")
-        print("test 4: Font loaded.")
+        logger.debug("test 4: Font loaded.")
     except Exception as e:
-        print("Could not load font:", e)
+        logger.error("Could not load font:", e)
         
-    print("test 5: Before fb.run")
+    logger.debug("test 5: Before fb.run")
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)
