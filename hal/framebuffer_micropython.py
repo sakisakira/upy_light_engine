@@ -25,7 +25,9 @@ class Framebuffer(framebuf.FrameBuffer):
         r = (col >> 8) & 15
         g = (col >> 4) & 15
         b = col & 15
-        return (((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3))
+        rgb565 = (((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3))
+        # Pre-swap for ST7789 Big Endian SPI format
+        return ((rgb565 & 0xFF) << 8) | (rgb565 >> 8)
 
     def clear(self, col=0):
         self.fill_565(col)
@@ -116,10 +118,13 @@ class Framebuffer(framebuf.FrameBuffer):
                 
                 dst_idx = dst_idx_base + j
                 if a == 15:
-                    dst[dst_idx] = (sr << 11) | (sg << 5) | sb
+                    out_col = (sr << 11) | (sg << 5) | sb
+                    dst[dst_idx] = ((out_col & 0xFF) << 8) | (out_col >> 8)
                     continue
                     
+                # Read destination (which is in Big Endian) and unswap it
                 dst_val = dst[dst_idx]
+                dst_val = ((dst_val & 0xFF) << 8) | (dst_val >> 8)
                 dr = (dst_val >> 11) & 31
                 dg = (dst_val >> 5) & 63
                 db = dst_val & 31
@@ -130,7 +135,10 @@ class Framebuffer(framebuf.FrameBuffer):
                 out_g = (sg * a + dg * inv_a) >> 4
                 out_b = (sb * a + db * inv_a) >> 4
                 
-                dst[dst_idx] = (out_r << 11) | (out_g << 5) | out_b
+                out_col = (out_r << 11) | (out_g << 5) | out_b
+                
+                # Re-swap to Big Endian before writing back
+                dst[dst_idx] = ((out_col & 0xFF) << 8) | (out_col >> 8)
 
     @micropython.viper
     def _blt_viper_rgb(self, x: int, y: int, src_buf, src_w: int, u: int, v: int, w: int, h: int, colkey: int):

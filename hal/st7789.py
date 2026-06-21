@@ -132,30 +132,13 @@ class ST7789:
         
         self.write_cmd(0x2C) # Memory Write
 
-    @staticmethod
-    @micropython.viper
-    def swap_bytes(buf, length: int):
-        """Fast 16-bit endianness swap for the entire framebuffer using Viper"""
-        p = ptr8(buf)
-        for i in range(0, length, 2):
-            temp = p[i]
-            p[i] = p[i+1]
-            p[i+1] = temp
-
     def show(self, buffer):
         """Fast transfer of the entire framebuffer to the display"""
         self.set_window(0, 0, self.width - 1, self.height - 1)
         
-        # MicroPython framebuf is Little Endian, ST7789 SPI expects Big Endian.
-        # We must swap bytes before sending, and swap back to keep the buffer intact.
-        length = int(len(buffer))
-        self.swap_bytes(buffer, length)
-        
         self.cs(0)
         self.dc(1)
-        # Using SPI DMA to send the entire bytearray at once
+        # Using SPI DMA to send the entire bytearray at once.
+        # Buffer is already pre-swapped (Big Endian) by framebuffer operations.
         self.spi.write(buffer)
         self.cs(1)
-        
-        # Swap back to Little Endian
-        self.swap_bytes(buffer, length)
