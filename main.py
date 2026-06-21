@@ -65,6 +65,8 @@ def update():
     global x, y, dx, dy
     import input as inp
     
+    sound.update()
+    
     if inp.button(inp.Button_Left):
         x -= 2
     if inp.button(inp.Button_Right):
