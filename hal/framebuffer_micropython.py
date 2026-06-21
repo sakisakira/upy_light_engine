@@ -173,25 +173,43 @@ def run(update, draw, fps=30):
     Game loop for MicroPython environment
     * Separate process required to reflect drawn content to ST7789 on Cardputer, etc.
     """
+    print("Entering run() function...")
     import time
     import machine
     from . import input_micropython
+    print("Importing modules in run() OK")
     
     # Initialize hardware input
+    print("Initializing input_micropython...")
     input_micropython.init()
+    print("input_micropython initialized.")
     
     # [Implementation Note]
     # SPI driver like ST7789 needs to be initialized here
-    # 例: display = st7789.ST7789(...)
+    
+    frame_count = 0
     
     while True:
+        if frame_count == 0:
+            print("Entering while True loop (Frame 1)...")
+            
         start = time.ticks_ms()
         
         update()
+        if frame_count == 0:
+            print("update() OK")
+            
         draw()
+        if frame_count == 0:
+            print("draw() OK")
         
         # Dummy screen reflection via SPI transfer
         # 例: display.show(screen.buffer)
+        
+        frame_count += 1
+        if frame_count % 60 == 0:
+            print(f"Engine Running... Frame: {frame_count}")
+
         
         elapsed = time.ticks_diff(time.ticks_ms(), start)
         wait_ms = (1000 // fps) - elapsed

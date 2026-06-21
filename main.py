@@ -4,7 +4,6 @@ from image import Image
 # Generate a test ARGB4444 sprite (circle: top red, bottom blue)
 def create_test_sprite(width, height):
     buf = bytearray(width * height * 2)
-    mv = memoryview(buf).cast('H')
     
     cx = width / 2.0
     cy = height / 2.0
@@ -15,13 +14,13 @@ def create_test_sprite(width, height):
             if (x - cx)**2 + (y - cy)**2 <= radius_sq:
                 if y < cy:
                     # Red (a=15, r=15, g=0, b=0)
-                    mv[y * width + x] = (15 << 12) | (15 << 8) | (0 << 4) | 0
+                    val = (15 << 12) | (15 << 8) | (0 << 4) | 0
                 else:
                     # Blue (a=15, r=0, g=0, b=15)
-                    mv[y * width + x] = (15 << 12) | (0 << 8) | (0 << 4) | 15
-            else:
-                # Transparent
-                mv[y * width + x] = 0
+                    val = (15 << 12) | (0 << 8) | (0 << 4) | 15
+                idx = (y * width + x) * 2
+                buf[idx] = val & 0xFF
+                buf[idx+1] = val >> 8
             
     # Use Image class as a container for sprite data
     return Image(width, height, buf)
@@ -29,7 +28,6 @@ def create_test_sprite(width, height):
 # Generate a test ARGB4444 sprite (semi-transparent circular cyan gradient)
 def create_gradient_sprite(width, height):
     buf = bytearray(width * height * 2)
-    mv = memoryview(buf).cast('H')
     
     for y in range(height):
         for x in range(width):
@@ -44,7 +42,10 @@ def create_gradient_sprite(width, height):
             g = 15
             b = 15
             
-            mv[y * width + x] = (a << 12) | (r << 8) | (g << 4) | b
+            val = (a << 12) | (r << 8) | (g << 4) | b
+            idx = (y * width + x) * 2
+            buf[idx] = val & 0xFF
+            buf[idx+1] = val >> 8
             
     return Image(width, height, buf)
 
@@ -134,13 +135,22 @@ if __name__ == "__main__":
         
     sprite_gradient = create_gradient_sprite(32, 32)
     
+    print("test 1: Before import hal.font")
+
     import hal.font as font_lib
+    print("test 2: After import hal.font")
+    
     try:
-        score_font = font_lib.Font("fonts/score_font.afnt")
-        score_font_half = font_lib.Font("fonts/score_font_half.afnt")
+        # MicroPython on Cardputer has limited heap. score_font.afnt is ~180KB!
+        # We only load the 6px font (~6KB) to avoid Out Of Memory errors.
+        # score_font = font_lib.Font("fonts/score_font.afnt")
+        # score_font_half = font_lib.Font("fonts/score_font_half.afnt")
+        print("test 3: Loading test_6px_font.afnt...")
         score_font_6px = font_lib.Font("fonts/test_6px_font.afnt")
+        print("test 4: Font loaded.")
     except Exception as e:
         print("Could not load font:", e)
         
+    print("test 5: Before fb.run")
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)
