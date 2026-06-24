@@ -7,8 +7,10 @@ class SoundHAL:
     def __init__(self):
         self.i2s = None
         self.speaker = None
+        self.c_engine = None
         self.sample_rate = 44100
         self.is_ready = False
+        self.mode = "none"
         
         self.current_sequence = []
         self.current_note_end_time = 0
@@ -23,27 +25,20 @@ class SoundHAL:
         self._init_hardware()
         
     def _init_hardware(self):
-        # 1. Try to use official M5 library (UIFlow2 firmware)
+        # 1. Try to use custom C module (_sound_engine)
         try:
-            import M5
-            M5.begin()
-            self.speaker = M5.Speaker
-            self.speaker.setVolume(128)
-            self.use_m5 = True
+            import _sound_engine
+            self.c_engine = _sound_engine
+            self.mode = "c_module"
             self.is_ready = True
-            print("SoundHAL: Using official M5.Speaker")
+            print("SoundHAL: Using custom C module (_sound_engine)")
             return
         except ImportError:
-            self.use_m5 = False
-            print("SoundHAL: M5 module not found, falling back to bare I2S")
+            pass
             
-        # 2. Fallback to direct I2S and ES8311 I2C initialization (Bare MicroPython)
+        # 2. Try to use bare MicroPython I2S fallback
         try:
-            # Enable Amplifier (AMP_EN = GPIO 46)
-            amp_en = machine.Pin(46, machine.Pin.OUT)
-            amp_en.value(1)
-            
-            # Initialize I2S first so BCLK/WS are running (Cardputer ADV: BCLK=41, WS=43, DOUT=42)
+            print("SoundHAL: C module not found, falling back to bare I2S...")
             self.i2s = machine.I2S(
                 1,
                 sck=machine.Pin(41),
@@ -53,38 +48,43 @@ class SoundHAL:
                 bits=16,
                 format=machine.I2S.STEREO,
                 rate=self.sample_rate,
-                ibuf=self.sample_rate * 4
+                ibuf=8192
             )
             
-            # Initialize I2C for ES8311 (Cardputer ADV: SDA=8, SCL=9)
             i2c = machine.I2C(1, scl=machine.Pin(9), sda=machine.Pin(8), freq=100000)
-            
-            # Check if ES8311 is present at address 0x18
-            devices = i2c.scan()
-            if 0x18 in devices:
-                # Proper initialization sequence for ES8311
-                # Must be done after I2S is running so BCLK is active
-                i2c.writeto_mem(0x18, 0x00, b'\x1f') # Reset
-                time.sleep(0.02)
-                i2c.writeto_mem(0x18, 0x00, b'\x00') # Clear reset
-                i2c.writeto_mem(0x18, 0x00, b'\x80') # Power up
-                i2c.writeto_mem(0x18, 0x0D, b'\x01') # Vmid power up
-                i2c.writeto_mem(0x18, 0x12, b'\x00') # DAC power up
-                i2c.writeto_mem(0x18, 0x14, b'\x00') # Unmute DAC / output
-                # REG 0x01: bit 7 (0x80) = Use BCLK as MCLK!
-                i2c.writeto_mem(0x18, 0x01, b'\xBF') # Clock manager (BCLK as MCLK)
-                i2c.writeto_mem(0x18, 0x31, b'\x00') # Set Volume Max
-                i2c.writeto_mem(0x18, 0x32, b'\x00') # Set Volume Max
-                time.sleep(0.02)
+            if 0x18 in i2c.scan():
+                print("SoundHAL: Initializing ES8311...")
+                def write_reg(reg, val):
+                    i2c.writeto_mem(0x18, reg, bytes([val]))
+                # ES8311 Init array from M5Unified
+                write_reg(0x00, 0x80)  # RESET/ CSM POWER ON
+                write_reg(0x01, 0xB5)  # CLOCK_MANAGER/ MCLK=BCLK
+                write_reg(0x02, 0x18)  # CLOCK_MANAGER/ MULT_PRE=3
+                write_reg(0x0D, 0x01)  # SYSTEM/ Power up analog circuitry
+                write_reg(0x12, 0x00)  # SYSTEM/ power-up DAC
+                write_reg(0x13, 0x10)  # SYSTEM/ Enable output to HP drive
+                write_reg(0x32, 0xBF)  # DAC volume
+                write_reg(0x37, 0x08)  # Bypass DAC equalizer
                 
+            self.mode = "bare_i2s"
             self.is_ready = True
-            print("SoundHAL: Bare I2S initialized successfully")
+            print("SoundHAL: Bare I2S ready")
+            return
         except Exception as e:
-            try:
-                import logger
-                logger.error(f"Sound init failed: {e}")
-            except ImportError:
-                print(f"Sound init failed: {e}")
+            print(f"SoundHAL: Bare I2S failed: {e}")
+            
+        # 3. Try official M5.Speaker as last resort
+        try:
+            import M5
+            M5.begin()
+            self.speaker = M5.Speaker
+            self.speaker.setVolume(128)
+            self.mode = "m5_speaker"
+            self.is_ready = True
+            print("SoundHAL: Using official M5.Speaker")
+            return
+        except ImportError:
+            print("SoundHAL: All sound initializations failed.")
 
     def play_tone(self, freq, duration_ms):
         self.play_sequence([(freq, duration_ms)])
@@ -98,52 +98,58 @@ class SoundHAL:
     def _start_current_note(self):
         if self.current_note_index >= len(self.current_sequence):
             self.current_freq = 0
-            if self.use_m5:
-                # Try to mute speaker if possible
-                pass
+            # Optional: fade out / send silence to prevent pop
+            if self.mode == "bare_i2s" and self.i2s:
+                self.i2s.write(bytearray(1024))
             return
             
-        freq, dur = self.current_sequence[self.current_note_index]
-        self.current_freq = freq
-        self.current_note_end_time = time.ticks_add(time.ticks_ms(), dur)
+        note = self.current_sequence[self.current_note_index]
+        self.current_freq = note[0]
+        duration = note[1]
         
-        if self.use_m5:
-            if freq > 0:
-                self.speaker.tone(int(freq), int(dur))
-        else:
-            self._fill_buffer(freq)
-
-    def _fill_buffer(self, freq):
-        if freq <= 0:
-            for i in range(len(self.square_buf)):
-                self.square_buf[i] = 0
-            self.phase = 0
-        else:
-            period = self.sample_rate / freq
-            for i in range(self.samples_per_frame):
-                val = 4000 if (self.phase % period) < (period / 2) else -4000
-                struct.pack_into('<hh', self.square_buf, i * 4, int(val), int(val))
-                self.phase += 1
-
-    def stop(self):
-        self.current_sequence = []
-        self.current_note_index = 0
-        self.current_freq = 0
-
+        self.current_note_end_time = time.ticks_add(time.ticks_ms(), duration)
+        
+        if self.mode == "c_module" and self.c_engine:
+            # We will implement real async sequence playing in C module later,
+            # for now, if there's a play_tone function, we use it.
+            if hasattr(self.c_engine, 'play_tone'):
+                self.c_engine.play_tone(self.current_freq, duration)
+        elif self.mode == "m5_speaker" and self.speaker:
+            self.speaker.tone(self.current_freq, duration)
+            
     def update(self):
-        if not self.is_ready: return
+        if not self.is_ready or not self.current_sequence: return
         
-        if self.current_note_index < len(self.current_sequence):
-            now = time.ticks_ms()
-            if time.ticks_diff(now, self.current_note_end_time) >= 0:
-                # Note ended, play next note
-                self.current_note_index += 1
-                self._start_current_note()
+        now = time.ticks_ms()
+        if self.current_freq > 0 and time.ticks_diff(self.current_note_end_time, now) <= 0:
+            self.current_note_index += 1
+            self._start_current_note()
+            
+        if self.mode == "bare_i2s" and self.current_freq > 0:
+            self._fill_and_play_i2s()
+            
+    def _fill_and_play_i2s(self):
+        # Generate 1 frame of square wave
+        if self.current_freq == 0:
+            return
+            
+        period = self.sample_rate // self.current_freq
+        half_period = period // 2
+        amplitude = 8000
+        
+        # Simple square wave generation in Python (slow, but works for basic beeps)
+        # To make it faster, we could pre-calculate the buffer or use memoryview
+        for i in range(self.samples_per_frame):
+            if (self.phase % period) < half_period:
+                val = amplitude
+            else:
+                val = -amplitude
                 
-            # If using bare I2S, feed the audio buffer constantly
-            if not self.use_m5 and self.i2s and self.current_freq > 0:
-                try:
-                    # Write one frame of audio; this will block briefly if DMA buffer is full
-                    self.i2s.write(self.square_buf)
-                except Exception:
-                    pass
+            # Pack as 16-bit little endian, stereo
+            self.square_buf[i*4] = val & 0xFF
+            self.square_buf[i*4+1] = (val >> 8) & 0xFF
+            self.square_buf[i*4+2] = val & 0xFF
+            self.square_buf[i*4+3] = (val >> 8) & 0xFF
+            self.phase += 1
+            
+        self.i2s.write(self.square_buf)

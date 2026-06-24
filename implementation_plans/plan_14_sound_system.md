@@ -28,15 +28,21 @@
 - Windows専用のHAL。
 - Windows標準の `winsound` モジュールを使用します。（`winsound.Beep` は処理をブロックしてしまうため、動的生成したWAVデータを `winsound.PlaySound(data, winsound.SND_MEMORY | winsound.SND_ASYNC)` に渡すことで非同期再生を実現します）
 
-### 3. Cardputer向け実装 (`hal/sound_micropython.py`)
-MicroPythonの `machine.I2S` と `machine.I2C` を用いて、実機で音を鳴らします。
+### 3. Cardputer向け実装 (`hal/sound_micropython.py` & カスタムCモジュール)
+Cardputer（ESP32-S3）上では、ガベージコレクション(GC)による音飛びを防ぐ「カスタムファームウェア（Cモジュール）」を本命としつつ、公式ファームウェア環境でも動く「純粋なMicroPython（Bare I2S）」を代替として自動で切り替える設計とします。
 
-#### [NEW] `hal/sound_micropython.py`
-- **ES8311の初期化**:
-  - Cardputer ADVのオーディオコーデック（ES8311）を有効にするため、I2C（SDA=8, SCL=9）経由で設定レジスタを書き込み、DACとアンプを有効化します。
-- **I2Sによる発音**:
-  - `machine.I2S` (BCLK=41, WS=43, DOUT=42) を初期化します。
-  - `play_tone` が呼ばれた際、指定周波数の「矩形波（Square Wave）」のPCM波形データを動的に `bytearray` として生成し、I2S経由で非同期にDMA転送します。
+#### [NEW] `c_modules/sound_engine` (Phase A: 本命)
+- C言語のFreeRTOSタスクを用いて、バックグラウンドでI2Sのオーディオバッファ（BGMや効果音）を合成・転送し続けるネイティブモジュール。
+- GCの停止時間（10〜30ms）の影響を受けず、60FPSのゲームループを邪魔せずにノイズレスな音声を再生します。
+- **特定完了したハードウェア仕様**:
+  - I2Sピン: BCLK=41, WS=43, DOUT=42
+  - I2Cピン: SDA=8, SCL=9 (ES8311初期化用)
+  - アンプの専用ENピンは存在せず、ES8311経由で内部的に制御されます。
+
+#### [NEW] `hal/sound_micropython.py` (Phase B: HAL層・代替)
+- 起動時に `import _sound_engine` を試行し、成功すれば上記Cモジュールに処理を委譲します。
+- Cモジュールが存在しない（公式ファームウェア等）場合は、**純粋な `machine.I2S` と `machine.I2C` を用いたPython単体での再生（Bare I2S）** に自動でフォールバックします。
+- ES8311のMCLK生成（BCLKから生成）やアンプ有効化などの厳密な初期化レジスタ送信をPython側から行います。
 
 ### 4. 【検証済】Web (WASM) 向け実装の将来的な展望 (`hal/sound_web.py`)
 今回実装は行いませんが、このアーキテクチャが将来的にWeb環境（PyScriptやMicroPython WASM等）でも成立するかを検証しました。

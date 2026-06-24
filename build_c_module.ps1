@@ -36,8 +36,8 @@ $BUILD_COMMAND = @"
 echo '--- mpy-cross のビルド ---';
 make -C micropython/mpy-cross;
 echo '--- Cモジュールのビルド ---';
-echo '※ここに c_modules/ のビルドコマンド（make 等）を記述してください。';
-# 例: make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/micropython.cmake
+make -C micropython/ports/esp32 BOARD=ESP32_GENERIC_S3 submodules;
+make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/sound_engine/micropython.cmake BOARD=ESP32_GENERIC_S3;
 "@
 
 docker run --rm -v "${WORKSPACE_DIR}:/workspace" -w /workspace $IMAGE_NAME bash -c $BUILD_COMMAND
