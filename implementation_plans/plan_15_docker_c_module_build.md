@@ -8,6 +8,7 @@ MicroPythonのCモジュール（サウンドIC制御などを想定）をビル
 - **ベースイメージ**: ESP32-S3の開発ツールが揃っている `espressif/idf` をベースイメージとして使用します。
 - **Cモジュールディレクトリ**: ソースコード格納用に `c_modules/` ディレクトリを新設します。
 - **ビルドスクリプト**: Windows向けに `build_c_module.ps1` を作成します。
+- **MicroPythonソースコード**: IDEでの自動補完（IntelliSense）を有効にし、ビルドバージョンを固定するため、ビルド時のcloneではなく `git submodule` としてローカルに取り込みます。
 
 ## Proposed Changes
 
