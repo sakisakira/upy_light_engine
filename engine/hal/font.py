@@ -1,6 +1,6 @@
 import sys
 
-from image import Image
+from engine.image import Image
 
 class Font:
     def __init__(self, filepath):

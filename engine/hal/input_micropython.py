@@ -1,5 +1,5 @@
 import machine
-from constants import *
+from engine.constants import *
 
 I2C_ADDR = 0x34
 i2c = None

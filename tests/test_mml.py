@@ -6,7 +6,7 @@ try:
 except AttributeError:
     sys.path.insert(0, '..')
     sys.path.insert(0, '/')
-import mml_parser
+from engine import mml_parser
 
 class TestMMLParser(unittest.TestCase):
     def test_basic_notes(self):

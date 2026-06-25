@@ -5,9 +5,9 @@ import sys
 import tests.mock_micropython
 
 # Now we can import the modules safely
-import framebuffer
-from hal import framebuffer_cpython
-from hal import framebuffer_micropython
+from engine import framebuffer
+from engine.hal import framebuffer_cpython
+from engine.hal import framebuffer_micropython
 
 class TestFramebuffer(unittest.TestCase):
     def test_color_conversion(self):

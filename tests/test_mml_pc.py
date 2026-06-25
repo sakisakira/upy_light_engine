@@ -4,7 +4,7 @@ import os
 # Add parent directory to path to import our engine modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import sound
+from engine import sound
 import time
 
 def test_mml_playback():

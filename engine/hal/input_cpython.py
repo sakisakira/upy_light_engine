@@ -1,4 +1,4 @@
-from constants import *
+from engine.constants import *
 
 # PC Tkinter mapping
 _tk_to_key = {

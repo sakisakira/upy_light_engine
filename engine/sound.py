@@ -1,12 +1,12 @@
 import sys
-import mml_parser
+from engine import mml_parser
 
 # Select the appropriate HAL based on the platform
 if sys.platform == 'esp32':
-    from hal.sound_micropython import SoundHAL
+    from engine.hal.sound_micropython import SoundHAL
 elif sys.platform == 'win32':
     try:
-        from hal.sound_cpython_win import SoundHAL
+        from engine.hal.sound_cpython_win import SoundHAL
     except ImportError:
         class SoundHAL:
             def play_tone(self, freq, duration_ms): pass
@@ -14,7 +14,7 @@ elif sys.platform == 'win32':
             def stop(self): pass
             def update(self): pass
 elif sys.platform == 'darwin':
-    from hal.sound_cpython_mac import SoundHAL
+    from engine.hal.sound_cpython_mac import SoundHAL
 else:
     # Fallback to dummy
     class SoundHAL:

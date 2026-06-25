@@ -10,7 +10,7 @@ except AttributeError:
     sys.path.insert(0, '..')
     sys.path.insert(0, '/')
 
-import sound
+from engine import sound
 
 def main():
     # Cross-platform ticks_ms

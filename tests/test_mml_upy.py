@@ -1,6 +1,6 @@
 import sys
 import time
-import sound
+from engine import sound
 
 def play_test(mode_name, force_mode=None):
     if force_mode:

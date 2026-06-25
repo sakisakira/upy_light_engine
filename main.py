@@ -1,6 +1,6 @@
-import framebuffer as fb
-from image import Image
-import sound
+from engine import framebuffer as fb
+from engine.image import Image
+from engine import sound
 
 # Generate a test ARGB4444 sprite (circle: top red, bottom blue)
 def create_test_sprite(width, height):
@@ -64,7 +64,7 @@ score_font_16px = None
 
 def update():
     global x, y, dx, dy
-    import input as inp
+    from engine import input as inp
     
     sound.update()
     
@@ -84,7 +84,7 @@ def update():
     if y >= 135 - 32: y = 135 - 32
 
 def draw():
-    import input as inp
+    from engine import input as inp
     # Fill background depending on button press
     if inp.button(inp.Button_A):
         fb.screen.fill(fb.color(136, 0, 0)) # Red for A
@@ -113,7 +113,7 @@ def draw():
     fb.screen.line(110, 80, 110, 120, fb.color(0, 255, 255)) # vertical (Cyan)
 
     # Test text drawing
-    import hal.font as font_lib
+    import engine.hal.font as font_lib
     if score_font:
         font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font)
     if score_font_half:
@@ -134,31 +134,31 @@ def draw():
         font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px)
 
 if __name__ == "__main__":
-    import logger
+    from engine import logger
     # Set to False to mute all debug logs
     logger.DEBUG_ENABLED = True
 
     try:
-        sprite = Image.load("images/test_sprite.uimg")
+        sprite = Image.load("assets/images/test_sprite.uimg")
     except Exception as e:
         logger.error(f"Failed to load uimg: {e}")
         sprite = create_test_sprite(16, 16)
         
     sprite_gradient = create_gradient_sprite(32, 32)
     
-    logger.debug("test 1: Before import hal.font")
+    logger.debug("test 1: Before import engine.hal.font")
 
-    import hal.font as font_lib
-    logger.debug("test 2: After import hal.font")
+    import engine.hal.font as font_lib
+    logger.debug("test 2: After import engine.hal.font")
     
     try:
         # MicroPython on Cardputer has limited heap. score_font.afnt is ~180KB!
         # We only load the 6px font (~6KB) to avoid Out Of Memory errors.
-        # score_font = font_lib.Font("fonts/score_font.afnt")
-        # score_font_half = font_lib.Font("fonts/score_font_half.afnt")
+        # score_font = font_lib.Font("assets/fonts/score_font.afnt")
+        # score_font_half = font_lib.Font("assets/fonts/score_font_half.afnt")
         logger.debug("test 3: Loading fonts...")
-        score_font_6px = font_lib.Font("fonts/test_6px_font.afnt")
-        score_font_16px = font_lib.Font("fonts/test_16px_custom.afnt")
+        score_font_6px = font_lib.Font("assets/fonts/test_6px_font.afnt")
+        score_font_16px = font_lib.Font("assets/fonts/test_16px_custom.afnt")
         logger.debug("test 4: Fonts loaded.")
     except Exception as e:
         import gc

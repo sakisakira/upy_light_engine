@@ -6,7 +6,7 @@ from PIL import Image as PILImage
 # Add the root directory to sys.path to import tools and modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import tools.png2uimg
-from image import Image
+from engine.image import Image
 
 class TestPng2Uimg(unittest.TestCase):
     def setUp(self):

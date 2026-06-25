@@ -181,7 +181,7 @@ def run(update, draw, fps=30):
     Game loop for MicroPython environment
     * Separate process required to reflect drawn content to ST7789 on Cardputer, etc.
     """
-    import logger
+    from engine import logger
     logger.debug("Entering run() function...")
     import time
     import machine
