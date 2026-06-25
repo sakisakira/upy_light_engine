@@ -1,5 +1,6 @@
 import framebuffer as fb
 from image import Image
+import sound
 
 # Generate a test ARGB4444 sprite (circle: top red, bottom blue)
 def create_test_sprite(width, height):
@@ -164,5 +165,9 @@ if __name__ == "__main__":
         logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
         
     logger.debug("test 5: Before fb.run")
+    
+    # Play background music!
+    sound.play_mml("T180 O5 E8 E8 R8 E8 R8 C8 E4 G4 R4 O4 G4 R4")
+    
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)

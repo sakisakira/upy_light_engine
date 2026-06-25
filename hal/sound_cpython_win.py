@@ -1,4 +1,4 @@
-import subprocess
+import winsound
 import struct
 import math
 import time
@@ -12,8 +12,6 @@ class SoundHAL:
         self.is_playing = False
         self.play_start_time = 0
         self.total_duration = 0
-        self.process = None
-        self.temp_wav = "/tmp/upy_light_engine_beep.wav"
 
     def play_tone(self, freq, duration_ms):
         self.play_sequence([(freq, duration_ms)])
@@ -22,12 +20,10 @@ class SoundHAL:
         if not notes:
             return
 
-        self.stop()
-        
         self.current_sequence = notes
         self.total_duration = sum(duration for freq, duration in notes) / 1000.0
         
-        # Generate the entire sequence as a single WAV file
+        # Generate the entire sequence as a single WAV in memory
         audio_data = bytearray()
         for freq, duration_ms in notes:
             num_samples = int(self.sample_rate * (duration_ms / 1000.0))
@@ -50,26 +46,23 @@ class SoundHAL:
         wav_content = header + audio_data
         
         # Save to temp file
-        with open(self.temp_wav, "wb") as f:
+        temp_wav = os.path.join(os.environ.get('TEMP', 'C:\\temp'), "upy_light_engine_beep.wav")
+        with open(temp_wav, "wb") as f:
             f.write(wav_content)
             
-        # Play asynchronously using afplay
-        try:
-            self.process = subprocess.Popen(["afplay", self.temp_wav])
-            self.is_playing = True
-            self.play_start_time = time.time()
-        except FileNotFoundError:
-            print("SoundHAL: afplay command not found. Audio playback is disabled.")
+        # Play asynchronously from file
+        winsound.PlaySound(temp_wav, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        self.is_playing = True
+        self.play_start_time = time.time()
 
     def stop(self):
-        if self.process and self.process.poll() is None:
-            self.process.terminate()
-            self.process.wait()
-        self.is_playing = False
+        if self.is_playing:
+            winsound.PlaySound(None, winsound.SND_PURGE)
+            self.is_playing = False
 
     def update(self):
         if self.is_playing:
-            if self.process and self.process.poll() is not None:
+            if time.time() - self.play_start_time > self.total_duration:
                 self.is_playing = False
                 self.current_sequence = []
 
