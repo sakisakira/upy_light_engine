@@ -4,13 +4,14 @@ import struct
 import math
 
 class SoundHAL:
-    def __init__(self):
+    def __init__(self, force_mode=None):
         self.i2s = None
         self.speaker = None
         self.c_engine = None
         self.sample_rate = 44100
         self.is_ready = False
         self.mode = "none"
+        self.force_mode = force_mode
         
         self.current_sequence = []
         self.current_note_end_time = 0
@@ -26,15 +27,18 @@ class SoundHAL:
         
     def _init_hardware(self):
         # 1. Try to use custom C module (_sound_engine)
-        try:
-            import _sound_engine
-            self.c_engine = _sound_engine
-            self.mode = "c_module"
-            self.is_ready = True
-            print("SoundHAL: Using custom C module (_sound_engine)")
-            return
-        except ImportError:
-            pass
+        if self.force_mode != "bare_i2s":
+            try:
+                import _sound_engine
+                self.c_engine = _sound_engine
+                self.mode = "c_module"
+                self.is_ready = True
+                print("SoundHAL: Using custom C module (_sound_engine)")
+                return
+            except ImportError:
+                pass
+        else:
+            print("SoundHAL: Skipping C module check due to force_mode='bare_i2s'")
             
         # 2. Try to use bare MicroPython I2S fallback
         try:
