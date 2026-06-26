@@ -29,7 +29,12 @@ You must convert standard images and fonts into the engine's highly optimized pr
 The engine works out-of-the-box on standard MicroPython firmware, so getting started is very easy! However, to achieve full-speed I2S audio playback performance without stuttering, we highly recommend building the custom firmware containing our optimized C-module sound engine.
 
 1. **(Optional) Build and Flash Custom Firmware**:
-   Use the provided build script to compile MicroPython with PSRAM support and the custom sound engine.
+   First, initialize the MicroPython submodule and apply the required hardware patches (I2S and panic handler fixes) for the Cardputer Adv:
+   ```powershell
+   git submodule update --init
+   .\scripts\apply_patches.ps1
+   ```
+   Next, use the provided build script to compile MicroPython with PSRAM support and the custom sound engine.
    ```powershell
    # Windows (Requires WSL/Docker for the build environment)
    .\scripts\build_c_module.ps1
