@@ -8,6 +8,8 @@ _tk_to_key = {
     'd': Key_D,
     'n': Key_N,
     'm': Key_M,
+    'h': Key_H,
+    'j': Key_J,
     'space': Key_Space,
     'Return': Key_Enter
 }
@@ -19,7 +21,9 @@ _button_to_key = {
     Button_Left: Key_A,
     Button_Right: Key_D,
     Button_A: Key_N,
-    Button_B: Key_M
+    Button_B: Key_M,
+    Button_X: Key_H,
+    Button_Y: Key_J
 }
 
 # Current state of physical keys

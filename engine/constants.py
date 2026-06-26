@@ -17,6 +17,8 @@ class Key(IntEnum):
     D = auto()
     N = auto()
     M = auto()
+    H = auto()
+    J = auto()
     Space = auto()
     Enter = auto()
 
@@ -39,6 +41,8 @@ Key_S = Key.S
 Key_D = Key.D
 Key_N = Key.N
 Key_M = Key.M
+Key_H = Key.H
+Key_J = Key.J
 Key_Space = Key.Space
 Key_Enter = Key.Enter
 
