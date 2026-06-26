@@ -9,7 +9,7 @@ import time
 
 def test_mml_playback():
     print("Playing Super Mario theme intro MML...")
-    mml = "T180 O5 E8 E8 R8 E8 R8 C8 E4 G4 R4 O4 G4 R4"
+    mml = "T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2"
     
     sound.play_mml(mml)
     

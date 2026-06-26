@@ -167,7 +167,7 @@ if __name__ == "__main__":
     logger.debug("test 5: Before fb.run")
     
     # Play background music!
-    sound.play_mml("T180 O5 E8 E8 R8 E8 R8 C8 E4 G4 R4 O4 G4 R4")
+    sound.play_mml("T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
     
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)
