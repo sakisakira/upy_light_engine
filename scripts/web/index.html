@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardputer Pyxel WASM Runner</title>
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        body {
+            background-color: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: sans-serif;
+            margin-top: 50px;
+        }
+        canvas {
+            background-color: #000;
+            image-rendering: pixelated;
+            width: 480px;  /* 240 * 2 */
+            height: 270px; /* 135 * 2 */
+            border: 2px solid #555;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            outline: none;
+        }
+        #controls {
+            margin-top: 20px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        #loading {
+            font-size: 18px;
+            color: #ffaa00;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading Game Engine (WASM)... Please wait.</div>
+    <!-- The canvas element that framebuffer_wasm.py draws to -->
+    <canvas id="gameCanvas" width="240" height="135" tabindex="0"></canvas>
+    <div id="controls">
+        Controls: Arrow Keys (D-Pad), Z (A), X (B), C (X), V (Y), Space (Select), Enter (Start)
+    </div>
+
+    <py-config>
+        [[fetch]]
+        from = "../../"
+        to_folder = "."
+        files = [
+            "main.py",
+            "engine/__init__.py",
+            "engine/constants.py",
+            "engine/framebuffer.py",
+            "engine/image.py",
+            "engine/input.py",
+            "engine/logger.py",
+            "engine/mml_parser.py",
+            "engine/sound.py",
+            "engine/hal/__init__.py",
+            "engine/hal/font.py",
+            "engine/hal/framebuffer_wasm.py",
+            "engine/hal/input_wasm.py",
+            "engine/hal/sound_wasm.py",
+            "assets/fonts/test_6px_font.afnt",
+            "assets/fonts/test_16px_custom.afnt",
+            "assets/images/test_sprite.uimg"
+        ]
+    </py-config>
+
+    <!-- Python code to run -->
+    <script type="py">
+        import sys
+        import js
+        
+        # Hide loading message
+        js.document.getElementById("loading").style.display = "none"
+        
+        # Focus canvas so it can receive keyboard events immediately
+        js.document.getElementById("gameCanvas").focus()
+        
+        # Add root to sys.path just in case
+        if "." not in sys.path:
+            sys.path.insert(0, ".")
+            
+        # We fetched main.py into the root of the virtual FS.
+        # Use runpy to execute it as the main script so the __main__ block runs!
+        import runpy
+        runpy.run_module("main", run_name="__main__")
+    </script>
+</body>
+</html>

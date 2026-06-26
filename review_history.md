@@ -194,3 +194,49 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
 - **生成と出力 (`test_16px_custom`)**:
   例として、アルファベット大文字・数字・空白・一部記号の計39文字のみを抽出した `fonts/test_16px_custom.afnt` を生成。これによりメモリ使用量が従来の半分（約25KB）に抑えられた。
   また、アトラスの構成が一目で分かるプレビュー画像も `fonts/test_16px_custom.png` として自動出力されるようにした。
+
+---
+
+## 2026-06-25: プロジェクト構造の整理とWeb (WASM) HALの追加
+
+**【指摘・要望内容】**
+> 次はWebやろうと思うけど、その前にディレクトリ構成がごちゃごちゃなのが気になってきたよ。一般的なOSSを参考にディレクトリ構成を提案してくれる?
+> WebってそっちじゃなくてWASM HALだよ。TODO見てね。
+> はやっ！ って思ったけど黒い画面から動かないね。Console見ても怪しいのわからなかった。
+> 実装報告書も毎回良い文章だと思うから、implementation_planみたいにディレクトリ作って置いといてね。どの計画に対応した実装かもわかるようにして。
+
+**【設計判断と対応】**
+- **ディレクトリ構成のリファクタリング (plan_17)**:
+  `engine/` (コアコード), `assets/` (リソース), `docs/` (ドキュメント), `scripts/` (ビルド・実行スクリプト) に分類し、一般的なOSS構成に整理。モジュール間のインポートの不整合を解消した。
+- **Web (WASM) HALの実装 (plan_18)**:
+  TODOに記載されていた「Web (WASM) ターゲット」を実現するため、PyScript (Pyodide) を用いたバックエンド (`framebuffer_wasm.py`, `input_wasm.py`, `sound_wasm.py`) を実装。
+  * `framebuffer`: 16bitカラーからRGBAへの変換処理をPythonループで行うと遅いため、JavaScriptの関数 (`window.drawFramebufferWasm`) を定義して委譲することで高速化した。また `requestAnimationFrame` を使って非同期にゲームループを回すようにした。
+  * `input`: JSの `keydown` / `keyup` をPyodideのプロキシ経由で受け取り処理。
+  * `sound`: Web Audio APIの `OscillatorNode` と `GainNode` を使用してMML再生を非同期で実装。
+- **PyScript実行時の罠対応**:
+  `scripts/web/index.html` 内で `import main` として実行しようとしたところ、Pythonの仕様上 `__name__ == "__main__"` ブロックが実行されずゲームループが開始しないバグが発生。`import runpy; runpy.run_module("main", run_name="__main__")` に修正して解決した。
+- **実装報告書の永続化**:
+  毎回生成している `walkthrough.md` を計画書 (`plan_XX`) と対応づけるため、新たに `docs/walkthroughs/` ディレクトリを作成し保管するようにした。
+
+---
+
+## 2026-06-26: Web (WASM) HAL環境のデバッグとバグ修正
+
+**【指摘・要望内容】**
+> sound_wasmに実装ミスがあるみたい (TypeError: tuple indices must be integers or slices, not str)
+> 多分Button_Leftかな。 (NameError: name 'Button_LEFT' is not defined)
+> ふむちょっと先に進んだよ。 (AttributeError: 'Framebuffer' object has no attribute 'rect')
+> わーい！！ でも音楽が鳴ってない。。。 (The AudioContext was not allowed to start)
+> 作業報告も必要だったら更新しといてね。
+
+**【設計判断と対応】**
+- **サウンドAPIのタプルアンパック修正 (`engine/hal/sound_wasm.py`)**:
+  MMLパーサーが `(周波数, 長さ)` のタプルを返しているのに辞書としてアクセスしていたバグを修正し、正しくタプルをアンパックするようにした。
+- **キー入力定数のタイポ修正 (`engine/hal/input_wasm.py`)**:
+  キーマッピングの定数を `Button_LEFT` 等の大文字表記から、`engine/constants.py` に準拠した `Button_Left` 等のキャメルケース表記へ修正した。
+- **描画メソッドの完全移植 (`engine/hal/framebuffer_wasm.py`)**:
+  当初 `fill` 等の最小限の関数しか実装していなかったため `rect` が見つからずエラーになっていた。PC版 (`framebuffer_cpython.py`) の `Framebuffer` クラスが純粋な `bytearray` 操作で書かれていたため、メソッド群（`rect`, `pset`, `line`, `blt`等）をごっそりコピーしてWASM版へ移植した。
+- **ブラウザAutoplay制限の回避 (`engine/hal/sound_wasm.py`)**:
+  ページロード直後のWeb Audio APIの再生はブラウザにブロックされるため、`window` に `keydown` 等のイベントリスナーを登録し、ユーザー操作が発生した瞬間に `AudioContext.resume()` を呼んでロックを解除する仕組みを導入した。
+- **実装報告書の更新 (`docs/walkthroughs/walkthrough_18_wasm_hal.md`)**:
+  これらWASM環境特有のデバッグと修正履歴（全5項目）を、実装報告書の末尾に追記した。

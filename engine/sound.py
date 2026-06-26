@@ -4,6 +4,8 @@ from engine import mml_parser
 # Select the appropriate HAL based on the platform
 if sys.platform == 'esp32':
     from engine.hal.sound_micropython import SoundHAL
+elif sys.platform == 'emscripten':
+    from engine.hal.sound_wasm import SoundHAL
 elif sys.platform == 'win32':
     try:
         from engine.hal.sound_cpython_win import SoundHAL
