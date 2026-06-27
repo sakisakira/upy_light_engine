@@ -103,74 +103,13 @@ class Framebuffer:
             raise NotImplementedError("Diagonal line drawing is not supported yet.")
 
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
-        """
-        img: Image(ARGB4444) or Framebuffer(RGB565)
-        Switches between alpha blending or direct copy (colkey supported) based on format.
-        """
-        dst_w = self.width
-        dst_h = self.height
-        src_w = img.width
-        src_h = img.height
-        
-        dst_mv = self._mv
-        src_mv = img._mv
-        
-        # Clipping (Prevent drawing outside the screen. Negative width/flip omitted for now)
-        start_x = max(0, -x)
-        start_y = max(0, -y)
-        end_x = min(w, dst_w - x)
-        end_y = min(h, dst_h - y)
-        
-        if start_x >= end_x or start_y >= end_y:
-            return
-
+        from .software_renderer import draw_blt
         is_argb = getattr(img, "format", "") == "ARGB4444"
+        draw_blt(self._mv, self.width, self.height, x, y, img._mv, img.width, img.height, u, v, w, h, is_argb, colkey, byte_swap=False)
 
-        for i in range(start_y, end_y):
-            dst_idx_base = (y + i) * dst_w + x
-            src_idx_base = (v + i) * src_w + u
-            
-            for j in range(start_x, end_x):
-                src_val = src_mv[src_idx_base + j]
-                
-                if is_argb:
-                    # Decompose ARGB4444 into 4-bit components
-                    a = (src_val >> 12) & 0xF
-                    if a == 0:
-                        continue  # Skip if completely transparent
-                    
-                    r = (src_val >> 8) & 0xF
-                    g = (src_val >> 4) & 0xF
-                    b = src_val & 0xF
-                    
-                    # Expand to RGB565 width (5,6,5 bit)
-                    sr = (r << 1) | (r >> 3)
-                    sg = (g << 2) | (g >> 2)
-                    sb = (b << 1) | (b >> 3)
-                    
-                    if a == 15:
-                        # Overwrite directly if completely opaque
-                        dst_mv[dst_idx_base + j] = (sr << 11) | (sg << 5) | sb
-                        continue
-                        
-                    # Alpha blending process
-                    dst_val = dst_mv[dst_idx_base + j]
-                    dr = (dst_val >> 11) & 0x1F
-                    dg = (dst_val >> 5) & 0x3F
-                    db = dst_val & 0x1F
-                    
-                    inv_a = 16 - a
-                    # Speed up using bit shift (>> 4) instead of division
-                    out_r = (sr * a + dr * inv_a) >> 4
-                    out_g = (sg * a + dg * inv_a) >> 4
-                    out_b = (sb * a + db * inv_a) >> 4
-                    
-                    # Pack into RGB565 and write back
-                    dst_mv[dst_idx_base + j] = (out_r << 11) | (out_g << 5) | out_b
-                else:
-                    # RGB565 copy
-                    if src_val != colkey:
-                        dst_mv[dst_idx_base + j] = src_val
+    def sprite(self, cx, cy, spr, rotate=0.0, scale=1.0):
+        from .software_renderer import draw_sprite
+        draw_sprite(self._mv, self.width, self.height, cx, cy, spr.image._mv, spr.image.width, spr.image.height, spr.u, spr.v, spr.w, spr.h, spr.colkey, rotate, scale, byte_swap=False)
 
 
 screen = Framebuffer()

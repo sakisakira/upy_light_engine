@@ -55,8 +55,9 @@ class Framebuffer(framebuf.FrameBuffer):
             super().vline(x1, min(y1, y2), abs(y2 - y1) + 1, self._col4444_to_565(col))
         elif y1 == y2:
             super().hline(min(x1, x2), y1, abs(x2 - x1) + 1, self._col4444_to_565(col))
-        else:
-            return
+    def sprite(self, cx, cy, spr, rotate=0.0, scale=1.0):
+        from .software_renderer import draw_sprite
+        draw_sprite(self.buffer, self.width, self.height, cx, cy, spr.image.buffer, spr.image.width, spr.image.height, spr.u, spr.v, spr.w, spr.h, spr.colkey, rotate, scale, byte_swap=True)
 
     def blt(self, x, y, img, u, v, w, h, colkey=-1):
         """

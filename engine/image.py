@@ -31,3 +31,7 @@ class Image:
             width, height = struct.unpack("<HH", header[6:10])
             data = bytearray(f.read(width * height * 2))
         return cls(width, height, data)
+
+    def subimage(self, u, v, w, h, colkey=-1, tint=None):
+        from .sprite import Sprite
+        return Sprite(self, u, v, w, h, colkey, tint)

@@ -6,8 +6,8 @@ from engine import sound
 def create_test_sprite(width, height):
     buf = bytearray(width * height * 2)
     
-    cx = width / 2.0
-    cy = height / 2.0
+    cx = (width - 1) / 2.0
+    cy = (height - 1) / 2.0
     radius_sq = (width / 2.0) ** 2
     
     for y in range(height):
@@ -32,8 +32,8 @@ def create_gradient_sprite(width, height):
     
     for y in range(height):
         for x in range(width):
-            cx = width / 2.0
-            cy = height / 2.0
+            cx = (width - 1) / 2.0
+            cy = (height - 1) / 2.0
             dist = ((x - cx)**2 + (y - cy)**2)**0.5
             max_dist = width / 2.0
             
@@ -61,12 +61,14 @@ score_font = None
 score_font_half = None
 score_font_6px = None
 score_font_16px = None
+frames = 0
 
 def update():
-    global x, y, dx, dy
+    global x, y, dx, dy, frames
     from engine import input as inp
     
     sound.update()
+    frames += 1
     
     if inp.button(inp.Button_Left):
         x -= 2
@@ -101,9 +103,23 @@ def draw():
 
     # Blend the sprite
     if sprite:
-        fb.screen.blt(x, y, sprite, 0, 0, sprite.width, sprite.height)
+        # Convert left-top (x, y) to center (cx, cy)
+        cx = x + sprite.w / 2
+        cy = y + sprite.h / 2
+        
+        import math
+        # Breathing animation: scale oscillates between 0.8 and 1.2
+        breath_scale = 1.0 + 0.2 * math.sin(frames * 0.1)
+        fb.screen.sprite(cx, cy, sprite, scale=breath_scale)
+        
     if sprite_gradient:
-        fb.screen.blt(x - 40, y, sprite_gradient, 0, 0, sprite_gradient.width, sprite_gradient.height)
+        cx_grad = (x - 40) + sprite_gradient.w / 2
+        cy_grad = y + sprite_gradient.h / 2
+        
+        import math
+        # Breathing animation: scale oscillates between 1.0 and 2.0
+        grad_scale = 1.5 + 0.5 * math.sin(frames * 0.05)
+        fb.screen.sprite(cx_grad, cy_grad, sprite_gradient, scale=grad_scale)
 
     # Test pset
     fb.screen.pset(10, 10, fb.color(255, 255, 255))
@@ -139,12 +155,14 @@ if __name__ == "__main__":
     logger.DEBUG_ENABLED = True
 
     try:
-        sprite = Image.load("assets/images/test_sprite.uimg")
+        img_sprite = Image.load("assets/images/test_sprite.uimg")
     except Exception as e:
         logger.error(f"Failed to load uimg: {e}")
-        sprite = create_test_sprite(16, 16)
+        img_sprite = create_test_sprite(16, 16)
+    sprite = img_sprite.subimage(0, 0, img_sprite.width, img_sprite.height)
         
-    sprite_gradient = create_gradient_sprite(32, 32)
+    img_gradient = create_gradient_sprite(32, 32)
+    sprite_gradient = img_gradient.subimage(0, 0, img_gradient.width, img_gradient.height)
     
     logger.debug("test 1: Before import engine.hal.font")
 
