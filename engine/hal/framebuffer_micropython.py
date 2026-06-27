@@ -207,6 +207,9 @@ def run(update, draw, fps=30):
     frame_count = 0
     
     while True:
+        from engine import time as engine_time
+        engine_time.clock.tick()
+        
         if frame_count == 0:
             logger.debug("Entering while True loop (Frame 1)...")
             

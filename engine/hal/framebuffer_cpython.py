@@ -94,6 +94,11 @@ _draw_func = None
 _target_fps = 30
 
 def _tick():
+    global _root
+    
+    from engine import time as engine_time
+    engine_time.clock.tick()
+    
     global _img_tk
     
     if _update_func:

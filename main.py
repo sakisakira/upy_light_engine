@@ -86,11 +86,25 @@ score_font_half = None
 score_font_6px = None
 score_font_16px = None
 frames = 0
+is_start_pressed = False
 
 def update():
     global x, y, dx, dy, frames
+    global is_start_pressed
     from engine import input as inp
+    from engine.time import clock
     
+    current_start = inp.button(inp.Button_Start)
+    if current_start and not is_start_pressed:
+        if clock.is_paused:
+            clock.resume()
+        else:
+            clock.pause()
+    is_start_pressed = current_start
+    
+    if clock.is_paused:
+        return
+        
     sound.update()
     frames += 1
     
@@ -180,6 +194,15 @@ def draw():
         w16, h16 = font_lib.measure_text(text_str_16, score_font_16px)
         fb.screen.rect(10, 100, w16, h16, fb.color(50, 50, 50))
         font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px)
+
+    from engine.time import clock
+    if score_font_6px:
+        text_str = f"FPS: {clock.fps}"
+        if clock.is_paused:
+            text_str += " (PAUSED)"
+        w, h = font_lib.measure_text(text_str, score_font_6px)
+        fb.screen.rect(fb.screen.width - w - 2, 2, w, h, fb.color(0, 0, 0))
+        font_lib.text(fb.screen, fb.screen.width - w - 2, 2, text_str, score_font_6px)
 
 if __name__ == "__main__":
     from engine import logger

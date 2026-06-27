@@ -132,6 +132,9 @@ def _tick(time_ms):
     if dt >= (1000 / _target_fps):
         _last_time = time_ms
         
+        from engine import time as engine_time
+        engine_time.clock.tick()
+        
         if _update_func:
             _update_func()
             

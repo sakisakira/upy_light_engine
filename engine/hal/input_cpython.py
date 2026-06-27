@@ -23,7 +23,9 @@ _button_to_key = {
     Button_A: Key_N,
     Button_B: Key_M,
     Button_X: Key_H,
-    Button_Y: Key_J
+    Button_Y: Key_J,
+    Button_Start: Key_Enter,
+    Button_Select: Key_Space
 }
 
 # Current state of physical keys
