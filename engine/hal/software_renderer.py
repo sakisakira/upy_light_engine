@@ -88,40 +88,90 @@ def draw_blt(dst, dst_w, dst_h, x, y, src, src_w, src_h, u, v, w, h, is_argb, co
                         dst[d_idx] = swapped & 0xFF
                         dst[d_idx+1] = swapped >> 8
 
+import math
+
 def draw_sprite(dst, dst_w, dst_h, cx, cy, src, src_w, src_h, u, v, w, h, colkey=-1, rotate=0.0, scale=1.0, byte_swap=False):
     """
     Software fallback for sprite rendering.
     Assumes src is ARGB4444.
     """
-    half_w = w * scale * 0.5
-    half_h = h * scale * 0.5
-    
-    start_x = int(cx - half_w)
-    start_y = int(cy - half_h)
-    end_x = int(cx + half_w) + 1
-    end_y = int(cy + half_h) + 1
-    
-    min_x = max(0, start_x)
-    min_y = max(0, start_y)
-    max_x = min(dst_w, end_x)
-    max_y = min(dst_h, end_y)
-    
-    if min_x >= max_x or min_y >= max_y:
-        return
+    if rotate == 0.0:
+        half_w = w * scale * 0.5
+        half_h = h * scale * 0.5
+        start_x = int(cx - half_w)
+        start_y = int(cy - half_h)
+        end_x = int(cx + half_w) + 1
+        end_y = int(cy + half_h) + 1
         
-    inv_scale = 1.0 / scale
-    
+        min_x = max(0, start_x)
+        min_y = max(0, start_y)
+        max_x = min(dst_w, end_x)
+        max_y = min(dst_h, end_y)
+        
+        if min_x >= max_x or min_y >= max_y:
+            return
+            
+        inv_scale = 1.0 / scale
+        cos_inv = inv_scale
+        sin_inv = 0.0
+    else:
+        cos_f = math.cos(rotate) * scale
+        sin_f = math.sin(rotate) * scale
+        hw = w * 0.5
+        hh = h * 0.5
+        corners = [
+            ( hw,  hh),
+            ( hw, -hh),
+            (-hw,  hh),
+            (-hw, -hh),
+        ]
+        min_cx = max_cx = min_cy = max_cy = 0
+        first = True
+        for (px, py) in corners:
+            rx = px * cos_f - py * sin_f
+            ry = px * sin_f + py * cos_f
+            if first:
+                min_cx, max_cx = rx, rx
+                min_cy, max_cy = ry, ry
+                first = False
+            else:
+                if rx < min_cx: min_cx = rx
+                elif rx > max_cx: max_cx = rx
+                if ry < min_cy: min_cy = ry
+                elif ry > max_cy: max_cy = ry
+                
+        start_x = int(cx + min_cx)
+        start_y = int(cy + min_cy)
+        end_x = int(cx + max_cx) + 1
+        end_y = int(cy + max_cy) + 1
+        
+        min_x = max(0, start_x)
+        min_y = max(0, start_y)
+        max_x = min(dst_w, end_x)
+        max_y = min(dst_h, end_y)
+        
+        if min_x >= max_x or min_y >= max_y:
+            return
+            
+        inv_scale = 1.0 / scale
+        cos_inv = math.cos(-rotate) * inv_scale
+        sin_inv = math.sin(-rotate) * inv_scale
+
     if not byte_swap:
         for dy in range(min_y, max_y):
+            dist_y = dy - cy
+            sx_base = -dist_y * sin_inv + w * 0.5
+            sy_base =  dist_y * cos_inv + h * 0.5
             dst_idx_base = dy * dst_w
-            sy = int(((dy - cy) * inv_scale + h * 0.5) // 1)
-            if sy < 0 or sy >= h: continue
-            src_idx_base = (v + sy) * src_w + u
             
             for dx in range(min_x, max_x):
-                sx = int(((dx - cx) * inv_scale + w * 0.5) // 1)
+                dist_x = dx - cx
+                sx = int((dist_x * cos_inv + sx_base) // 1)
                 if sx < 0 or sx >= w: continue
+                sy = int((dist_x * sin_inv + sy_base) // 1)
+                if sy < 0 or sy >= h: continue
                 
+                src_idx_base = (v + sy) * src_w + u
                 src_val = src[src_idx_base + sx]
                 
                 a = (src_val >> 12) & 0xF
@@ -146,15 +196,19 @@ def draw_sprite(dst, dst_w, dst_h, cx, cy, src, src_w, src_h, u, v, w, h, colkey
                 dst[dst_idx_base + dx] = (out_r << 11) | (out_g << 5) | out_b
     else:
         for dy in range(min_y, max_y):
+            dist_y = dy - cy
+            sx_base = -dist_y * sin_inv + w * 0.5
+            sy_base =  dist_y * cos_inv + h * 0.5
             dst_idx_base = dy * dst_w
-            sy = int(((dy - cy) * inv_scale + h * 0.5) // 1)
-            if sy < 0 or sy >= h: continue
-            src_idx_base = (v + sy) * src_w + u
             
             for dx in range(min_x, max_x):
-                sx = int(((dx - cx) * inv_scale + w * 0.5) // 1)
+                dist_x = dx - cx
+                sx = int((dist_x * cos_inv + sx_base) // 1)
                 if sx < 0 or sx >= w: continue
+                sy = int((dist_x * sin_inv + sy_base) // 1)
+                if sy < 0 or sy >= h: continue
                 
+                src_idx_base = (v + sy) * src_w + u
                 s_idx = (src_idx_base + sx) * 2
                 src_val = src[s_idx] | (src[s_idx+1] << 8)
                 

@@ -3,7 +3,7 @@ from engine.image import Image
 from engine import sound
 
 # Generate a test ARGB4444 sprite (circle: top red, bottom blue)
-def create_test_sprite(width, height):
+def create_test_image(width, height):
     buf = bytearray(width * height * 2)
     
     cx = (width - 1) / 2.0
@@ -27,7 +27,7 @@ def create_test_sprite(width, height):
     return Image(width, height, buf)
 
 # Generate a test ARGB4444 sprite (semi-transparent circular cyan gradient)
-def create_gradient_sprite(width, height):
+def create_gradient_image(width, height):
     buf = bytearray(width * height * 2)
     
     for y in range(height):
@@ -50,6 +50,29 @@ def create_gradient_sprite(width, height):
             
     return Image(width, height, buf)
 
+# Generate a test ARGB4444 sprite (RGB triangle)
+def create_triangle_image(width, height):
+    buf = bytearray(width * height * 2)
+    
+    cx = width / 2.0
+    for y in range(height):
+        for x in range(width):
+            if 2 <= y <= height - 2:
+                half_span = (y - 2.0) * (width / 2.0 - 2.0) / (height - 4.0) if height > 4 else 0
+                if cx - half_span <= x <= cx + half_span:
+                    y_ratio = (y - 2.0) / (height - 4.0)
+                    x_ratio = (x - (cx - half_span)) / (2 * half_span) if half_span > 0 else 0.5
+                    
+                    r = int(15 * (1.0 - y_ratio))
+                    g = int(15 * y_ratio * (1.0 - x_ratio))
+                    b = int(15 * y_ratio * x_ratio)
+                    
+                    val = (15 << 12) | (r << 8) | (g << 4) | b
+                    idx = (y * width + x) * 2
+                    buf[idx] = val & 0xFF
+                    buf[idx+1] = val >> 8
+    return Image(width, height, buf)
+
 # --- Game State ---
 x = 100
 y = 50
@@ -57,6 +80,7 @@ dx = 2
 dy = 2
 sprite = None
 sprite_gradient = None
+sprite_triangle = None
 score_font = None
 score_font_half = None
 score_font_6px = None
@@ -102,12 +126,12 @@ def draw():
         fb.screen.rect(bx, by, bw, bh, bcol)
 
     # Blend the sprite
+    import math
     if sprite:
         # Convert left-top (x, y) to center (cx, cy)
         cx = x + sprite.w / 2
         cy = y + sprite.h / 2
         
-        import math
         # Breathing animation: scale oscillates between 0.8 and 1.2
         breath_scale = 1.0 + 0.2 * math.sin(frames * 0.1)
         fb.screen.sprite(cx, cy, sprite, scale=breath_scale)
@@ -116,10 +140,18 @@ def draw():
         cx_grad = (x - 40) + sprite_gradient.w / 2
         cy_grad = y + sprite_gradient.h / 2
         
-        import math
         # Breathing animation: scale oscillates between 1.0 and 2.0
         grad_scale = 1.5 + 0.5 * math.sin(frames * 0.05)
         fb.screen.sprite(cx_grad, cy_grad, sprite_gradient, scale=grad_scale)
+        
+    if sprite_triangle:
+        cx_tri = (x + 40) + sprite_triangle.w / 2
+        cy_tri = (y + 40) + sprite_triangle.h / 2
+        # Continuous rotation
+        rot = frames * 0.05
+        # Scale oscillates slightly
+        tri_scale = 1.2 + 0.3 * math.sin(frames * 0.03)
+        fb.screen.sprite(cx_tri, cy_tri, sprite_triangle, rotate=rot, scale=tri_scale)
 
     # Test pset
     fb.screen.pset(10, 10, fb.color(255, 255, 255))
@@ -158,11 +190,14 @@ if __name__ == "__main__":
         img_sprite = Image.load("assets/images/test_sprite.uimg")
     except Exception as e:
         logger.error(f"Failed to load uimg: {e}")
-        img_sprite = create_test_sprite(16, 16)
+        img_sprite = create_test_image(16, 16)
     sprite = img_sprite.subimage(0, 0, img_sprite.width, img_sprite.height)
         
-    img_gradient = create_gradient_sprite(32, 32)
+    img_gradient = create_gradient_image(32, 32)
     sprite_gradient = img_gradient.subimage(0, 0, img_gradient.width, img_gradient.height)
+    
+    img_triangle = create_triangle_image(32, 32)
+    sprite_triangle = img_triangle.subimage(0, 0, img_triangle.width, img_triangle.height)
     
     logger.debug("test 1: Before import engine.hal.font")
 
