@@ -175,8 +175,9 @@ class Framebuffer(framebuf.FrameBuffer):
                 if src_val != colkey:
                     dst[dst_idx_base + j] = src_val
 
+import gc
+gc.collect()
 screen = Framebuffer(240, 135)
-
 def run(update, draw, fps=30):
     """
     Game loop for MicroPython environment
