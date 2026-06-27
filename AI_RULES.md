@@ -5,8 +5,8 @@
   * 変更内容を確認したい事も多いので、特に指示がない限りは変更量を控え目にして下さい。
   * 変更の意図や要点を docs/walkthroughs に残してください。
 * **レビューの記録**: コードレビューや設計変更が行われた際は、必ずその指摘内容と対応方針を `review_history.md` に追記してください。
-* **実装計画の記録**: 実装計画は implementation_plans ディレクトリに格納して、後で確認できるようにして下さい。ファイル名は plan_XX_xxxxxxxx.md などにして下さい。
-* **実装報告書の記録**: 実装報告は walkthroughs に入れて下さい。ファイル名は walkthrough_XX_xxxxxxxx.md などにして下さい。計画とのひもづけがわかるように。
+* **実装計画の記録**: 実装計画は `docs/plans` ディレクトリ配下に格納して、後で確認できるようにして下さい。ファイル名は `plan_XX_xxxxxxxx.md` などにして下さい。
+* **実装報告書の記録**: 実装報告は `docs/walkthroughs` ディレクトリ配下に格納して、後で確認できるようにして下さい。ファイル名は `walkthrough_XX_xxxxxxxx.md` などにして下さい。計画とのひもづけがわかるように。
 * **依存関係の制限**: PC(CPython)環境でのテストにおいて、`pygame` や `numpy` などの巨大なライブラリの使用は避け、標準ライブラリや `Pillow` 程度の軽量なものに留めてください。
 * **アーキテクチャ制約**: スプライト(ARGB4444)と画面バッファ(RGB565)はクラスを分離して管理し、実機(MicroPython/Cardputer)でのViperの活用やメモリ節約を常に意識した設計にしてください。
 * **命名規則**: HALなどのモジュールは `hal/framebuffer_micropython.py`、`hal/framebuffer_cpython.py` のようにディレクトリ(`hal`)に格納し、それらに対するインターフェース (framebuffer.mpy) はhalの外側に配置して下さい。
