@@ -240,3 +240,22 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
   ページロード直後のWeb Audio APIの再生はブラウザにブロックされるため、`window` に `keydown` 等のイベントリスナーを登録し、ユーザー操作が発生した瞬間に `AudioContext.resume()` を呼んでロックを解除する仕組みを導入した。
 - **実装報告書の更新 (`docs/walkthroughs/walkthrough_18_wasm_hal.md`)**:
   これらWASM環境特有のデバッグと修正履歴（全5項目）を、実装報告書の末尾に追記した。
+
+---
+
+## 2026-06-28: API挙動統一とWASM環境のINDEX8対応
+
+**【指摘・要望内容】**
+> (1) 実機 (Cardputer) 上で方向キーが効かない、色が期待と異なる（暗い青など）。
+> (2) PC側を見たら矩形ぬりつぶしが枠だけ描画されてる。動きが違う。引数 is_filled を与える方が好き。
+> (3) WASM版でエラーが出る（ModuleNotFoundError, byte_swapエラー等）、またキーとボタンの割り当てをPCと同じにしてほしい。
+
+**【設計判断と対応】**
+- **HAL間の挙動の統一 (`engine/hal/`)**:
+  PC (CPython) と実機 (MicroPython) の間で `framebuf.rect()` の挙動（塗りつぶしか枠線か）に差異があったため、全プラットフォーム共通で `rect(x, y, w, h, col, is_filled=True)` として統一。内部で `framebuf.fill_rect` 等を正しく呼び分けるように修正した。
+- **ST7789 ドライバのエンディアン修正 (`engine/hal/st7789.py`)**:
+  Cardputer実機で色が暗い青になる問題は、16-bitカラー（RGB565）のエンディアン（バイトオーダー）指定がディスプレイの期待と逆だったため発生していた。Big Endian 形式に正しく修正し、期待通りの発色を得た。
+- **WASM環境の INDEX8 化とキーマッピング統一 (`engine/hal/framebuffer_wasm.py`, `input_wasm.py`, `scripts/web/index.html`)**:
+  - `software_renderer.py` が INDEX8（パレット）専用になった変更が WASM 側に反映されていなかったため、WASM版のフレームバッファも INDEX8 形式に変更。描画時に JavaScript 側へパレット配列を渡し、JS内で 32-bit RGBA に高速変換するアーキテクチャに改修した。
+  - WASM用の fetch リストに新設されたモジュール (`palette.py`, `sprite.py`, `time.py` 等) を追加。
+  - WASM のキー入力をPC版と同様（方向キー = W/A/S/D、ボタン = N/M/H/J）に統一した。
