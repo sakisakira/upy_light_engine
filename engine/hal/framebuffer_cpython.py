@@ -65,25 +65,33 @@ class Framebuffer:
         draw_sprite(self._mv, self.width, self.height, cx, cy, spr.image._mv, spr.image.width, spr.image.height, spr.u, spr.v, spr.w, spr.h, spr.colkey, rotate, scale, spr.tint)
 
     def text(self, font, text, x, y, color=1, scale=1.0):
-        if font.format == "INDEX8":
+        if hasattr(font, 'image') and font.image.format == "INDEX8":
             dst_w = self.width
             dst_h = self.height
-            char_w = 8
-            char_h = 12
+            char_w = font.char_w
+            char_h = font.char_h
+            cols = font.cols
             
             for i, char in enumerate(text):
                 code = ord(char)
-                if code < 32 or code > 126:
-                    code = 32
-                idx = code - 32
-                u = (idx % 16) * char_w
-                v = (idx // 16) * char_h
+                idx = -1
+                if font.char_map is not None:
+                    if code in font.char_map:
+                        idx = font.char_map[code]
+                else:
+                    if 32 <= code <= 126:
+                        idx = code - 32
                 
-                cx = x + i * char_w * scale + (char_w * scale * 0.5)
-                cy = y + (char_h * scale * 0.5)
+                if idx < 0: continue
+                
+                u = (idx % cols) * char_w
+                v = (idx // cols) * char_h
+                
+                cx = int(x + i * char_w * scale + (char_w * scale * 0.5))
+                cy = int(y + (char_h * scale * 0.5))
                 
                 from .software_renderer import draw_sprite
-                draw_sprite(self._mv, dst_w, dst_h, cx, cy, font._mv, 128, 72, u, v, char_w, char_h, colkey=0, scale=scale, tint=color)
+                draw_sprite(self._mv, dst_w, dst_h, cx, cy, font.image._mv, font.image.width, font.image.height, u, v, char_w, char_h, colkey=0, scale=scale, tint=color)
 
 
 # ---- Window and Game Loop Management ----

@@ -259,3 +259,16 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
   - `software_renderer.py` が INDEX8（パレット）専用になった変更が WASM 側に反映されていなかったため、WASM版のフレームバッファも INDEX8 形式に変更。描画時に JavaScript 側へパレット配列を渡し、JS内で 32-bit RGBA に高速変換するアーキテクチャに改修した。
   - WASM用の fetch リストに新設されたモジュール (`palette.py`, `sprite.py`, `time.py` 等) を追加。
   - WASM のキー入力をPC版と同様（方向キー = W/A/S/D、ボタン = N/M/H/J）に統一した。
+
+---
+
+## 2026-06-28: フォント（AFNT）描画処理のバグ修正とスケーリング対応
+
+**【指摘・要望内容】**
+> ゲーム側で新しいAFNTフォントを用いたテキスト描画を実行しようとした際、エンジン側の `text()` メソッド内でエラーが発生してクラッシュしたため、エンジン側を修正。
+
+**【設計判断と対応】**
+- **各HALの `text()` メソッド全面改修 (`engine/hal/framebuffer_*.py`)**:
+  - 旧実装では、新しい `Font` オブジェクトに対して `font.format` とアクセスしていたため属性エラーが発生していました。正しくは `font.image.format` や `font.image._mv` へアクセスするよう修正しました。
+  - CPython、WASM、MicroPython の全HALにおいて、`text()` メソッドが正しく `char_w`, `char_h`, `cols`, `char_map` を解釈し、各文字の適切な `(u, v)` 座標を計算したうえで、`software_renderer.draw_sprite()` を呼び出すように再構築しました。
+  - さらに、文字の拡大縮小描画をサポートするため、引数として `scale`（デフォルト値 `1.0`）を追加し、内部の文字ごとのX座標計算 (`cx`) および Y座標計算 (`cy`) にスケーリング率を適用するようにしました。
