@@ -8,6 +8,8 @@ _tk_to_key = {
     'd': Key_D,
     'n': Key_N,
     'm': Key_M,
+    'comma': Key_Comma,
+    'period': Key_Period,
     'h': Key_H,
     'j': Key_J,
     'space': Key_Space,
@@ -22,8 +24,8 @@ _button_to_key = {
     Button_Right: Key_D,
     Button_A: Key_N,
     Button_B: Key_M,
-    Button_X: Key_H,
-    Button_Y: Key_J,
+    Button_X: Key_Comma,
+    Button_Y: Key_Period,
     Button_Start: Key_Enter,
     Button_Select: Key_Space
 }

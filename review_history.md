@@ -272,3 +272,18 @@ MicroPython環境におけるパフォーマンスとメモリ効率を考慮し
   - 旧実装では、新しい `Font` オブジェクトに対して `font.format` とアクセスしていたため属性エラーが発生していました。正しくは `font.image.format` や `font.image._mv` へアクセスするよう修正しました。
   - CPython、WASM、MicroPython の全HALにおいて、`text()` メソッドが正しく `char_w`, `char_h`, `cols`, `char_map` を解釈し、各文字の適切な `(u, v)` 座標を計算したうえで、`software_renderer.draw_sprite()` を呼び出すように再構築しました。
   - さらに、文字の拡大縮小描画をサポートするため、引数として `scale`（デフォルト値 `1.0`）を追加し、内部の文字ごとのX座標計算 (`cx`) および Y座標計算 (`cy`) にスケーリング率を適用するようにしました。
+
+---
+
+## 2026-06-28: MicroPython実機環境におけるクラッシュとメモリ枯渇問題の解決
+
+**【指摘・要望内容】**
+> Cardputer実機でゲームを起動・リセットした際、「ぷちっと落ちる」「MemoryError: memory allocation failed, allocating 480 bytes」「TypeError: can't convert float to int」「AttributeError: 'module' object has no attribute 'sleep_ms'」など様々なエラーが多発したため、エンジン側の改善を要望。
+
+**【設計判断と対応】**
+- **ST7789ディスプレイドライバのメモリ確保 (`MemoryError`) 最適化 (`engine/hal/st7789.py`)**:
+  描画関数 `show()` の中で毎フレーム `bytearray(480)` を新規確保していたため、高速な描画ループ内でメモリ管理が破綻し `MemoryError` が発生していました。これを `__init__` で一度だけバッファを確保（Pre-allocate）し、毎フレーム使い回す仕様に変更することで、深刻なメモリリークを解消しました。
+- **モジュール名衝突（Shadowing）の解消 (`engine/hal/st7789.py` 等)**:
+  エンジン内に `time.py` が存在するため、ハードウェア操作ファイルで単に `import time` とすると、組み込みの `utime` より自前のモジュールが優先して読み込まれてしまい、`time.sleep_ms` が見つからないというエラーが発生していました。これを `import utime as time` と明示的に書き換えることで衝突を解決しました。
+- **MicroPython特有の厳格な型チェックへの対応 (`engine/hal/framebuffer_micropython.py`)**:
+  PC環境（CPython）では暗黙に整数として処理されていた「`float` を用いた描画座標の指定」が、MicroPythonの `framebuf` では厳密に `TypeError` となっていました。`rect` 関数等に渡る引数をすべて明示的に `int()` でキャストすることで解決しました。

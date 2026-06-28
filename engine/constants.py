@@ -21,6 +21,8 @@ class Key(IntEnum):
     J = auto()
     Space = auto()
     Enter = auto()
+    Comma = auto()
+    Period = auto()
 
 class Button(IntEnum):
     Up = auto()
@@ -45,6 +47,8 @@ Key_H = Key.H
 Key_J = Key.J
 Key_Space = Key.Space
 Key_Enter = Key.Enter
+Key_Comma = Key.Comma
+Key_Period = Key.Period
 
 # Logical Button Constants
 Button_Up = Button.Up

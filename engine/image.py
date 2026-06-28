@@ -18,8 +18,13 @@ class Image:
         if sys.implementation.name != 'micropython':
             self._mv = memoryview(self.buffer).cast('B')
 
+    _cache = {}
+
     @classmethod
     def load(cls, filename):
+        if filename in cls._cache:
+            return cls._cache[filename]
+            
         try:
             import struct
         except ImportError:
@@ -31,8 +36,12 @@ class Image:
             if header[4] != 2:
                 raise ValueError("Unsupported UIMG version (expected v2 INDEX8)")
             width, height = struct.unpack("<HH", header[6:10])
-            data = bytearray(f.read(width * height))
-        return cls(width, height, data)
+            data = bytearray(width * height)
+            f.readinto(data)
+            
+        img = cls(width, height, data)
+        cls._cache[filename] = img
+        return img
 
     def subimage(self, u, v, w, h, colkey=0, tint=None):
         from .sprite import Sprite

@@ -3,7 +3,19 @@ import sys
 from engine.image import Image
 
 class Font:
+    _cache = {}
+
+    def __new__(cls, filepath):
+        if filepath in cls._cache:
+            return cls._cache[filepath]
+        instance = super().__new__(cls)
+        cls._cache[filepath] = instance
+        return instance
+
     def __init__(self, filepath):
+        if hasattr(self, 'char_w'):
+            return
+            
         with open(filepath, 'rb') as f:
             header = f.read(4)
             if header not in (b"AFNT", b"AFN2"):
@@ -23,12 +35,13 @@ class Font:
                     cp = int.from_bytes(f.read(2), 'little')
                     self.char_map[cp] = i
             
-            # Read pixel data (ARGB4444)
-            pixel_data = bytearray(f.read())
+            img_w = self.char_w * self.cols
+            img_h = self.char_h * self.rows
             
-        img_w = self.char_w * self.cols
-        img_h = self.char_h * self.rows
-        
+            # Read pixel data (INDEX8) efficiently without intermediate bytes object
+            pixel_data = bytearray(img_w * img_h)
+            f.readinto(pixel_data)
+            
         self.image = Image(img_w, img_h, pixel_data)
 
 def measure_text(string, font, spacing=0):

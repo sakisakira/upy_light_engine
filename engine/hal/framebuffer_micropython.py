@@ -24,9 +24,10 @@ class Framebuffer(framebuf.FrameBuffer):
         self.fill(col)
 
     def pset(self, x, y, col):
-        super().pixel(x, y, col)
+        super().pixel(int(x), int(y), col)
 
     def rect(self, x, y, w, h, col, is_filled=True):
+        x, y, w, h = int(x), int(y), int(w), int(h)
         if is_filled:
             super().fill_rect(x, y, w, h, col)
         else:
@@ -229,11 +230,16 @@ class Framebuffer(framebuf.FrameBuffer):
                 u = (idx % cols) * char_w
                 v = (idx // cols) * char_h
                 
-                cx = int(x + i * char_w * scale + (char_w * scale * 0.5))
-                cy = int(y + (char_h * scale * 0.5))
-                
-                from .software_renderer import draw_sprite
-                draw_sprite(self._mv, dst_w, dst_h, cx, cy, font.image._mv, font.image.width, font.image.height, u, v, char_w, char_h, colkey=0, scale=scale, tint=color)
+                if scale == 1.0:
+                    px = int(x + i * char_w)
+                    py = int(y)
+                    tint_val = -1 if color is None else color
+                    self._blt_viper_index8(px, py, font.image.buffer, font.image.width, u, v, char_w, char_h, 0, tint_val)
+                else:
+                    cx = int(x + i * char_w * scale + (char_w * scale * 0.5))
+                    cy = int(y + (char_h * scale * 0.5))
+                    from .software_renderer import draw_sprite
+                    draw_sprite(self.buffer, dst_w, dst_h, cx, cy, font.image.buffer, font.image.width, font.image.height, u, v, char_w, char_h, colkey=0, scale=scale, tint=color)
 
 # ---- Window and Game Loop Management ----
 screen = Framebuffer(240, 135)
@@ -242,7 +248,7 @@ def run(update, draw, fps=30):
     import engine.hal.st7789 as st7789
     from engine import time as engine_time
     import engine.input as input
-    import time
+    import utime as time
     
     display = st7789.ST7789()
     
@@ -254,17 +260,23 @@ def run(update, draw, fps=30):
     
     target_ms = 1000 // fps
     
-    while True:
-        t0 = time.ticks_ms()
-        engine_time.clock.tick()
-        
-        update()
-        draw()
-        
-        display.show(screen.buffer)
-        
-        t1 = time.ticks_ms()
-        dt = time.ticks_diff(t1, t0)
-        sleep_ms = target_ms - dt
-        if sleep_ms > 0:
-            time.sleep_ms(sleep_ms)
+    import sys
+    try:
+        while True:
+            t0 = time.ticks_ms()
+            engine_time.clock.tick()
+            
+            update()
+            draw()
+            
+            display.show(screen.buffer)
+            
+            t1 = time.ticks_ms()
+            dt = time.ticks_diff(t1, t0)
+            sleep_ms = target_ms - dt
+            if sleep_ms > 0:
+                time.sleep_ms(sleep_ms)
+    except Exception as e:
+        with open('error.log', 'w') as f:
+            sys.print_exception(e, f)
+        raise

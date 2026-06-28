@@ -1,5 +1,5 @@
 import machine
-import time
+import utime as time
 
 class ST7789:
     """
@@ -29,6 +29,9 @@ class ST7789:
         
         self.reset()
         self.init_display()
+        
+        # Pre-allocate line buffer to prevent MemoryError during rapid frames
+        self.line_buf = bytearray(self.width * 2)
         
     def reset(self):
         """Hardware reset of the display"""
@@ -141,9 +144,8 @@ class ST7789:
         self.cs(0)
         self.dc(1)
         
-        # Line buffer for 16-bit pixels (width * 2 bytes)
-        # Allocate once per show() is very fast
-        line_buf = bytearray(self.width * 2)
+        # Use pre-allocated line buffer to prevent memory fragmentation
+        line_buf = self.line_buf
         
         self._send_lines_viper(buffer, line_buf, colors565, self.width, self.height, self.spi.write)
         

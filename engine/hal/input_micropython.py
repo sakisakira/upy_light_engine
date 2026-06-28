@@ -11,7 +11,11 @@ _hw_to_key = {
     17: Key_S,
     23: Key_D,
     68: Key_Space,
-    67: Key_Enter
+    67: Key_Enter,
+    44: Key_N,
+    48: Key_M,
+    54: Key_Comma,
+    58: Key_Period
 }
 
 # Cardputer bindings for logical buttons
@@ -20,8 +24,12 @@ _button_to_key = {
     Button_Down: Key_S,
     Button_Left: Key_A,
     Button_Right: Key_D,
-    Button_A: Key_Space,
-    Button_B: Key_Enter
+    Button_A: Key_N,
+    Button_B: Key_M,
+    Button_X: Key_Comma,
+    Button_Y: Key_Period,
+    Button_Start: Key_Enter,
+    Button_Select: Key_Space
 }
 
 _keys_pressed = set()
