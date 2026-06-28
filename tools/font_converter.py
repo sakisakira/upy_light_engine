@@ -73,7 +73,16 @@ def convert_png(png_path, out_path, colkey=None, color=None, shadow_color=None, 
         out_img.alpha_composite(main_layer, (dst_x, dst_y))
 
     # Save preview PNG
-    preview_path = out_path.replace('.afnt', '.png')
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        preview_dir = os.path.join(out_dir, "previews")
+    else:
+        preview_dir = "previews"
+    os.makedirs(preview_dir, exist_ok=True)
+    
+    basename = os.path.basename(out_path).replace('.afnt', '.png')
+    preview_path = os.path.join(preview_dir, basename)
+    
     out_img.save(preview_path)
     print(f"Saved preview to {preview_path} (size: {out_img.width}x{out_img.height}, cell: {new_char_w}x{new_char_h})")
 
@@ -184,7 +193,16 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
                 pixels[px, py] = (r, g, b, 255 if a > 127 else 0)
 
     # Save preview PNG
-    preview_path = out_path.replace('.afnt', '.png')
+    out_dir = os.path.dirname(out_path)
+    if out_dir:
+        preview_dir = os.path.join(out_dir, "previews")
+    else:
+        preview_dir = "previews"
+    os.makedirs(preview_dir, exist_ok=True)
+    
+    basename = os.path.basename(out_path).replace('.afnt', '.png')
+    preview_path = os.path.join(preview_dir, basename)
+    
     img.save(preview_path)
     print(f"Saved preview to {preview_path} (size: {img_w}x{img_h}, cell: {char_w}x{char_h})")
 
