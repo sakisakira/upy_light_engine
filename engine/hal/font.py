@@ -64,9 +64,9 @@ def measure_text(string, font, spacing=0):
         
     return w, h
 
-def text(fb, x, y, string, font, spacing=0):
+def text(fb, x, y, string, font, color=None, spacing=0):
     """
-    Draw a string to the framebuffer using the given Font.
+    Draw a string to the framebuffer using the specified Font.
     ASCII range 0x20 to 0x7E is supported.
     spacing: extra pixels (can be negative) to add between characters.
     """
@@ -94,8 +94,17 @@ def text(fb, x, y, string, font, spacing=0):
             u = col * font.char_w
             v = row * font.char_h
             
-            # Use alpha blending (blt handles ARGB4444 automatically)
-            fb.blt(cx, cy, font.image, u, v, font.char_w, font.char_h)
+            # Use alpha blending (blt handles colorkey automatically)
+            # Pass color as tint if provided
+            fb.blt(cx, cy, font.image, u, v, font.char_w, font.char_h, tint=color)
             
         # Advance cursor
         cx += font.char_w + spacing
+
+def text_shadowed(fb, x, y, string, font, color=1, shadow_color=0, shadow_offset=(1, 1), spacing=0):
+    """
+    Draw a string with a drop shadow.
+    """
+    if shadow_color is not None:
+        text(fb, x + shadow_offset[0], y + shadow_offset[1], string, font, shadow_color, spacing)
+    text(fb, x, y, string, font, color, spacing)

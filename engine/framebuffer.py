@@ -9,7 +9,25 @@ else:
 
 def color(r, g, b, a=255):
     """
-    Utility to generate the internal format ARGB4444 from common 8-bit (0-255) color specifications.
-    Example: color(255, 0, 0) -> 0xF00 (Opaque Red)
+    Utility to find the nearest INDEX8 palette color from RGB.
+    If a < 128, returns 0 (colorkey).
     """
-    return ((a >> 4) << 12) | ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+    if a < 128:
+        return 0
+        
+    from engine import palette
+    
+    min_dist = float('inf')
+    best_idx = 0
+    for i in range(1, 256): # skip 0 (colorkey)
+        c = palette.colors[i]
+        pr = (c >> 16) & 0xFF
+        pg = (c >> 8) & 0xFF
+        pb = c & 0xFF
+        dist = (r - pr)**2 + (g - pg)**2 + (b - pb)**2
+        if dist < min_dist:
+            min_dist = dist
+            best_idx = i
+            if dist == 0:
+                break
+    return best_idx

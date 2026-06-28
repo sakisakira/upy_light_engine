@@ -1,7 +1,9 @@
-def draw_blt(dst, dst_w, dst_h, x, y, src, src_w, src_h, u, v, w, h, is_argb, colkey=-1, byte_swap=False):
+import math
+
+def draw_blt(dst, dst_w, dst_h, x, y, src, src_w, src_h, u, v, w, h, colkey=0, tint=None):
     """
-    Software fallback for blt.
-    dst, src: memoryview('H') if byte_swap=False, else bytearray
+    Software fallback for blt. (INDEX8 8-bit palette format)
+    dst, src: memoryview('B') or bytearray
     """
     start_x = max(0, -x)
     start_y = max(0, -y)
@@ -11,89 +13,21 @@ def draw_blt(dst, dst_w, dst_h, x, y, src, src_w, src_h, u, v, w, h, is_argb, co
     if start_x >= end_x or start_y >= end_y:
         return
 
-    if not byte_swap:
-        for i in range(start_y, end_y):
-            dst_idx_base = (y + i) * dst_w + x
-            src_idx_base = (v + i) * src_w + u
-            
-            for j in range(start_x, end_x):
-                src_val = src[src_idx_base + j]
-                
-                if is_argb:
-                    a = (src_val >> 12) & 0xF
-                    if a == 0: continue
-                    r = (src_val >> 8) & 0xF
-                    g = (src_val >> 4) & 0xF
-                    b = src_val & 0xF
-                    sr = (r << 1) | (r >> 3)
-                    sg = (g << 2) | (g >> 2)
-                    sb = (b << 1) | (b >> 3)
-                    if a == 15:
-                        dst[dst_idx_base + j] = (sr << 11) | (sg << 5) | sb
-                        continue
-                    dst_val = dst[dst_idx_base + j]
-                    dr = (dst_val >> 11) & 0x1F
-                    dg = (dst_val >> 5) & 0x3F
-                    db = dst_val & 0x1F
-                    inv_a = 16 - a
-                    out_r = (sr * a + dr * inv_a) >> 4
-                    out_g = (sg * a + dg * inv_a) >> 4
-                    out_b = (sb * a + db * inv_a) >> 4
-                    dst[dst_idx_base + j] = (out_r << 11) | (out_g << 5) | out_b
+    for i in range(start_y, end_y):
+        dst_idx_base = (y + i) * dst_w + x
+        src_idx_base = (v + i) * src_w + u
+        
+        for j in range(start_x, end_x):
+            src_val = src[src_idx_base + j]
+            if src_val != colkey:
+                if tint is not None:
+                    dst[dst_idx_base + j] = tint
                 else:
-                    if src_val != colkey:
-                        dst[dst_idx_base + j] = src_val
-    else:
-        for i in range(start_y, end_y):
-            dst_idx_base = (y + i) * dst_w + x
-            src_idx_base = (v + i) * src_w + u
-            
-            for j in range(start_x, end_x):
-                s_idx = (src_idx_base + j) * 2
-                src_val = src[s_idx] | (src[s_idx+1] << 8)
-                
-                d_idx = (dst_idx_base + j) * 2
-                if is_argb:
-                    a = (src_val >> 12) & 15
-                    if a == 0: continue
-                    r = (src_val >> 8) & 15
-                    g = (src_val >> 4) & 15
-                    b = src_val & 15
-                    sr = (r << 1) | (r >> 3)
-                    sg = (g << 2) | (g >> 2)
-                    sb = (b << 1) | (b >> 3)
-                    if a == 15:
-                        out_col = (sr << 11) | (sg << 5) | sb
-                        swapped = ((out_col & 0xFF) << 8) | (out_col >> 8)
-                        dst[d_idx] = swapped & 0xFF
-                        dst[d_idx+1] = swapped >> 8
-                        continue
-                        
-                    dst_val = dst[d_idx] | (dst[d_idx+1] << 8)
-                    dst_val = ((dst_val & 0xFF) << 8) | (dst_val >> 8)
-                    dr = (dst_val >> 11) & 31
-                    dg = (dst_val >> 5) & 63
-                    db = dst_val & 31
-                    inv_a = 16 - a
-                    out_r = (sr * a + dr * inv_a) >> 4
-                    out_g = (sg * a + dg * inv_a) >> 4
-                    out_b = (sb * a + db * inv_a) >> 4
-                    out_col = (out_r << 11) | (out_g << 5) | out_b
-                    swapped = ((out_col & 0xFF) << 8) | (out_col >> 8)
-                    dst[d_idx] = swapped & 0xFF
-                    dst[d_idx+1] = swapped >> 8
-                else:
-                    if src_val != colkey:
-                        swapped = ((src_val & 0xFF) << 8) | (src_val >> 8)
-                        dst[d_idx] = swapped & 0xFF
-                        dst[d_idx+1] = swapped >> 8
+                    dst[dst_idx_base + j] = src_val
 
-import math
-
-def draw_sprite(dst, dst_w, dst_h, cx, cy, src, src_w, src_h, u, v, w, h, colkey=-1, rotate=0.0, scale=1.0, byte_swap=False):
+def draw_sprite(dst, dst_w, dst_h, cx, cy, src, src_w, src_h, u, v, w, h, colkey=0, rotate=0.0, scale=1.0, tint=None):
     """
-    Software fallback for sprite rendering.
-    Assumes src is ARGB4444.
+    Software fallback for sprite rendering. (INDEX8 8-bit palette format)
     """
     if rotate == 0.0:
         half_w = w * scale * 0.5
@@ -157,88 +91,24 @@ def draw_sprite(dst, dst_w, dst_h, cx, cy, src, src_w, src_h, u, v, w, h, colkey
         cos_inv = math.cos(-rotate) * inv_scale
         sin_inv = math.sin(-rotate) * inv_scale
 
-    if not byte_swap:
-        for dy in range(min_y, max_y):
-            dist_y = dy - cy
-            sx_base = -dist_y * sin_inv + w * 0.5
-            sy_base =  dist_y * cos_inv + h * 0.5
-            dst_idx_base = dy * dst_w
+    for dy in range(min_y, max_y):
+        dist_y = dy - cy
+        sx_base = -dist_y * sin_inv + w * 0.5
+        sy_base =  dist_y * cos_inv + h * 0.5
+        dst_idx_base = dy * dst_w
+        
+        for dx in range(min_x, max_x):
+            dist_x = dx - cx
+            sx = int((dist_x * cos_inv + sx_base) // 1)
+            if sx < 0 or sx >= w: continue
+            sy = int((dist_x * sin_inv + sy_base) // 1)
+            if sy < 0 or sy >= h: continue
             
-            for dx in range(min_x, max_x):
-                dist_x = dx - cx
-                sx = int((dist_x * cos_inv + sx_base) // 1)
-                if sx < 0 or sx >= w: continue
-                sy = int((dist_x * sin_inv + sy_base) // 1)
-                if sy < 0 or sy >= h: continue
-                
-                src_idx_base = (v + sy) * src_w + u
-                src_val = src[src_idx_base + sx]
-                
-                a = (src_val >> 12) & 0xF
-                if a == 0: continue
-                r = (src_val >> 8) & 0xF
-                g = (src_val >> 4) & 0xF
-                b = src_val & 0xF
-                sr = (r << 1) | (r >> 3)
-                sg = (g << 2) | (g >> 2)
-                sb = (b << 1) | (b >> 3)
-                if a == 15:
-                    dst[dst_idx_base + dx] = (sr << 11) | (sg << 5) | sb
-                    continue
-                dst_val = dst[dst_idx_base + dx]
-                dr = (dst_val >> 11) & 0x1F
-                dg = (dst_val >> 5) & 0x3F
-                db = dst_val & 0x1F
-                inv_a = 16 - a
-                out_r = (sr * a + dr * inv_a) >> 4
-                out_g = (sg * a + dg * inv_a) >> 4
-                out_b = (sb * a + db * inv_a) >> 4
-                dst[dst_idx_base + dx] = (out_r << 11) | (out_g << 5) | out_b
-    else:
-        for dy in range(min_y, max_y):
-            dist_y = dy - cy
-            sx_base = -dist_y * sin_inv + w * 0.5
-            sy_base =  dist_y * cos_inv + h * 0.5
-            dst_idx_base = dy * dst_w
+            src_idx_base = (v + sy) * src_w + u
+            src_val = src[src_idx_base + sx]
             
-            for dx in range(min_x, max_x):
-                dist_x = dx - cx
-                sx = int((dist_x * cos_inv + sx_base) // 1)
-                if sx < 0 or sx >= w: continue
-                sy = int((dist_x * sin_inv + sy_base) // 1)
-                if sy < 0 or sy >= h: continue
-                
-                src_idx_base = (v + sy) * src_w + u
-                s_idx = (src_idx_base + sx) * 2
-                src_val = src[s_idx] | (src[s_idx+1] << 8)
-                
-                a = (src_val >> 12) & 15
-                if a == 0: continue
-                r = (src_val >> 8) & 15
-                g = (src_val >> 4) & 15
-                b = src_val & 15
-                sr = (r << 1) | (r >> 3)
-                sg = (g << 2) | (g >> 2)
-                sb = (b << 1) | (b >> 3)
-                
-                d_idx = (dst_idx_base + dx) * 2
-                if a == 15:
-                    out_col = (sr << 11) | (sg << 5) | sb
-                    swapped = ((out_col & 0xFF) << 8) | (out_col >> 8)
-                    dst[d_idx] = swapped & 0xFF
-                    dst[d_idx+1] = swapped >> 8
-                    continue
-                    
-                dst_val = dst[d_idx] | (dst[d_idx+1] << 8)
-                dst_val = ((dst_val & 0xFF) << 8) | (dst_val >> 8)
-                dr = (dst_val >> 11) & 31
-                dg = (dst_val >> 5) & 63
-                db = dst_val & 31
-                inv_a = 16 - a
-                out_r = (sr * a + dr * inv_a) >> 4
-                out_g = (sg * a + dg * inv_a) >> 4
-                out_b = (sb * a + db * inv_a) >> 4
-                out_col = (out_r << 11) | (out_g << 5) | out_b
-                swapped = ((out_col & 0xFF) << 8) | (out_col >> 8)
-                dst[d_idx] = swapped & 0xFF
-                dst[d_idx+1] = swapped >> 8
+            if src_val != colkey:
+                if tint is not None:
+                    dst[dst_idx_base + dx] = tint
+                else:
+                    dst[dst_idx_base + dx] = src_val

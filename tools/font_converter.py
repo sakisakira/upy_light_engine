@@ -85,8 +85,8 @@ def convert_png(png_path, out_path, colkey=None, color=None, shadow_color=None, 
         for py in range(out_img.height):
             for px in range(out_img.width):
                 r, g, b, a = out_pixels[px, py]
-                val = ((a >> 4) << 12) | ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
-                f.write(val.to_bytes(2, byteorder='little'))
+                val = 1 if a > 127 else 0
+                f.write(bytes([val]))
                 
     print(f"Converted PNG to AFNT: {out_path}")
 
@@ -206,18 +206,14 @@ def convert_font(font_path, out_path, size=16, color=(255, 255, 255, 255),
         for py in range(img_h):
             for px in range(img_w):
                 r, g, b, a = pixels[px, py]
-                # ARGB4444
-                a4 = a >> 4
-                r4 = r >> 4
-                g4 = g >> 4
-                b4 = b >> 4
-                val = (a4 << 12) | (r4 << 8) | (g4 << 4) | b4
-                f.write(val.to_bytes(2, byteorder='little'))
+                # INDEX8: 0 for transparent, 1 for solid
+                val = 1 if a > 127 else 0
+                f.write(bytes([val]))
                 
-    print(f"Saved ARGB4444 font data to {out_path}")
+    print(f"Saved INDEX8 font data to {out_path}")
 
 if __name__ == "__main__":
-    description = """Convert TTF/BDF fonts or grid-based PNGs to AFNT (ARGB4444) for upy_light_engine.
+    description = """Convert TTF/BDF fonts or grid-based PNGs to AFNT (INDEX8) for upy_light_engine.
 
 Expected PNG Layout when using a .png input:
 - 16 columns x 6 rows (96 cells total)

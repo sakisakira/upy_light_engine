@@ -133,12 +133,34 @@ class ST7789:
         self.write_cmd(0x2C) # Memory Write
 
     def show(self, buffer):
-        """Fast transfer of the entire framebuffer to the display"""
+        """Fast transfer of the INDEX8 framebuffer to the display using colors565 palette"""
+        from ..palette import colors565
+        
         self.set_window(0, 0, self.width - 1, self.height - 1)
         
         self.cs(0)
         self.dc(1)
-        # Using SPI DMA to send the entire bytearray at once.
-        # Buffer is already pre-swapped (Big Endian) by framebuffer operations.
-        self.spi.write(buffer)
+        
+        # Line buffer for 16-bit pixels (width * 2 bytes)
+        # Allocate once per show() is very fast
+        line_buf = bytearray(self.width * 2)
+        
+        self._send_lines_viper(buffer, line_buf, colors565, self.width, self.height, self.spi.write)
+        
         self.cs(1)
+        
+    @micropython.viper
+    def _send_lines_viper(self, idx_buf, line_buf, pal_buf, w: int, h: int, spi_write):
+        src = ptr8(idx_buf)
+        dst = ptr8(line_buf)
+        pal = ptr8(pal_buf)
+        
+        idx = 0
+        for y in range(h):
+            for x in range(w):
+                c = src[idx]
+                pal_idx = c << 1
+                dst[x << 1] = pal[pal_idx]
+                dst[(x << 1) + 1] = pal[pal_idx + 1]
+                idx += 1
+            spi_write(line_buf)

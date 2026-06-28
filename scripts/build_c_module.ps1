@@ -1,10 +1,9 @@
 <#
 .SYNOPSIS
-MicroPython Cモジュール ビルドスクリプト
+MicroPython C Module Build Script
 
 .DESCRIPTION
-Dockerコンテナを利用して、ローカル環境を汚さずにCモジュールやファームウェアをビルドします。
-事前に Docker Desktop などが起動している必要があります。
+Uses Docker container to build C modules and firmware without polluting local env.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -14,36 +13,34 @@ $WORKSPACE_DIR = $PWD
 
 Write-Host "========== Docker Build Environment for MicroPython C Modules =========="
 
-# 1. Dockerイメージの存在確認とビルド
 $imageExists = docker images -q $IMAGE_NAME
 if (-not $imageExists) {
-    Write-Host "[INFO] Dockerイメージ '$IMAGE_NAME' が見つかりません。新しくビルドします..."
+    Write-Host "[INFO] Building Docker image '$IMAGE_NAME'..."
     docker build -t $IMAGE_NAME .
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "[ERROR] Dockerイメージのビルドに失敗しました。"
+        Write-Error "[ERROR] Docker build failed."
         exit $LASTEXITCODE
     }
-    Write-Host "[INFO] Dockerイメージのビルドが完了しました。"
+    Write-Host "[INFO] Docker build complete."
 } else {
-    Write-Host "[INFO] 既存のDockerイメージ '$IMAGE_NAME' を使用します。"
+    Write-Host "[INFO] Using existing Docker image '$IMAGE_NAME'."
 }
 
-# 2. コンテナ内でビルドを実行
-Write-Host "[INFO] コンテナ内でビルド処理を開始します..."
+Write-Host "[INFO] Starting build inside container..."
 
-# 実行するコマンド（mpy-crossのビルドなど、必要に応じて書き換えてください）
 $BUILD_COMMAND = @"
-echo '--- mpy-cross のビルド ---';
+echo '--- mpy-cross build ---';
 make -C micropython/mpy-cross;
-echo '--- Cモジュールのビルド ---';
-make -C micropython/ports/esp32 BOARD=ESP32_GENERIC_S3 BOARD_VARIANT=SPIRAM_OCT submodules;
-make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/sound_engine/micropython.cmake BOARD=ESP32_GENERIC_S3 BOARD_VARIANT=SPIRAM_OCT;
+echo '--- C module build ---';
+make -C micropython/ports/esp32 BOARD=ESP32_GENERIC_S3 submodules;
+make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/sound_engine/micropython.cmake BOARD=ESP32_GENERIC_S3;
 "@
 
 docker run --rm -v "${WORKSPACE_DIR}:/workspace" -w /workspace $IMAGE_NAME bash -c $BUILD_COMMAND
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "========== ビルドが正常に完了しました！ =========="
+    Write-Host "========== Build Completed Successfully! =========="
 } else {
-    Write-Host "========== [ERROR] ビルド中にエラーが発生しました =========="
+    Write-Host "========== [ERROR] Build Failed =========="
 }
+
