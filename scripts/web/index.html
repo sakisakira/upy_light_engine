@@ -43,7 +43,7 @@
     <!-- The canvas element that framebuffer_wasm.py draws to -->
     <canvas id="gameCanvas" width="240" height="135" tabindex="0"></canvas>
     <div id="controls">
-        Controls: Arrow Keys (D-Pad), Z (A), X (B), C (X), V (Y), Space (Select), Enter (Start)
+        Controls: W/A/S/D (D-Pad), N (A), M (B), H (X), J (Y), Space (Select), Enter (Start)
     </div>
 
     <py-config>
@@ -60,14 +60,19 @@
             "engine/logger.py",
             "engine/mml_parser.py",
             "engine/sound.py",
+            "engine/palette.py",
+            "engine/sprite.py",
+            "engine/time.py",
             "engine/hal/__init__.py",
             "engine/hal/font.py",
             "engine/hal/framebuffer_wasm.py",
             "engine/hal/input_wasm.py",
             "engine/hal/sound_wasm.py",
+            "engine/hal/software_renderer.py",
             "assets/fonts/test_6px_font.afnt",
-            "assets/fonts/test_16px_custom.afnt",
-            "assets/images/test_sprite.uimg"
+            "assets/fonts/test_16px_font.afnt",
+            "assets/images/test_sprite.uimg",
+            "assets/images/palette.bin"
         ]
     </py-config>
 

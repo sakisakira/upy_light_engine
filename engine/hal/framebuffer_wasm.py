@@ -12,16 +12,12 @@ class Framebuffer:
     def __init__(self):
         self.width = 240
         self.height = 135
-        # The framebuffer is 240x135 in 16-bit RGB565 (2 bytes per pixel)
-        self.buffer = bytearray(self.width * self.height * 2)
-        # Use memoryview with 'H' format (unsigned short) to access pixels easily
-        self._mv = memoryview(self.buffer).cast('H')
+        self.format = "INDEX8"
+        self.buffer = bytearray(self.width * self.height)
+        self._mv = memoryview(self.buffer).cast('B')
 
-        # To optimize WASM drawing, we create a JS function that does the
-        # RGB565 -> RGBA32 conversion and Canvas update. This is much faster
-        # than looping 32400 times per frame in Python.
         js.eval("""
-        window.drawFramebufferWasm = function(canvasId, buffer16) {
+        window.drawFramebufferWasm = function(canvasId, buffer8, palette24) {
             const canvas = document.getElementById(canvasId);
             if (!canvas) return;
             const ctx = canvas.getContext("2d");
@@ -30,38 +26,28 @@ class Framebuffer:
             }
             const imgData = window._wasmImgData;
             const data32 = new Uint32Array(imgData.data.buffer);
-            // buffer16 is a Uint16Array proxy, we need its data
-            const data16 = buffer16.toJs(); 
-            for (let i = 0; i < data16.length; i++) {
-                const p = data16[i];
-                const r = ((p >> 11) & 0x1F) * 255 / 31;
-                const g = ((p >> 5) & 0x3F) * 255 / 63;
-                const b = (p & 0x1F) * 255 / 31;
+            const data8 = buffer8.toJs();
+            const pal24 = palette24.toJs();
+            for (let i = 0; i < data8.length; i++) {
+                const c_idx = data8[i];
+                const col24 = pal24[c_idx];
+                const r = (col24 >> 16) & 0xFF;
+                const g = (col24 >> 8) & 0xFF;
+                const b = col24 & 0xFF;
                 data32[i] = (255 << 24) | (b << 16) | (g << 8) | r;
             }
             ctx.putImageData(imgData, 0, 0);
         }
         """)
 
-    def _col4444_to_565(self, col):
-        r = (col >> 8) & 15
-        g = (col >> 4) & 15
-        b = col & 15
-        return (((r << 1) | (r >> 3)) << 11) | (((g << 2) | (g >> 2)) << 5) | ((b << 1) | (b >> 3))
-
     def clear(self, col=0):
-        # Kept for compatibility (RGB565 input)
-        self.fill_565(col)
+        self.fill(col)
 
-    def fill_565(self, col):
+    def fill(self, col):
         for i in range(self.width * self.height):
             self._mv[i] = col
 
-    def fill(self, col):
-        """Fill the screen with a specific color (ARGB4444)"""
-        self.fill_565(self._col4444_to_565(col))
-
-    def rect_565(self, x, y, w, h, col, is_filled=True):
+    def rect(self, x, y, w, h, col, is_filled=True):
         start_x = max(0, x)
         start_y = max(0, y)
         end_x = min(self.width, x + w)
@@ -84,17 +70,11 @@ class Framebuffer:
                 mv[py * dst_w + start_x] = col
                 mv[py * dst_w + end_x - 1] = col
 
-    def rect(self, x, y, w, h, col, is_filled=True):
-        """Draw a rectangle (ARGB4444)"""
-        self.rect_565(x, y, w, h, self._col4444_to_565(col), is_filled)
-
     def pset(self, x, y, col):
-        """Draw a pixel (ARGB4444)"""
         if 0 <= x < self.width and 0 <= y < self.height:
-            self._mv[y * self.width + x] = self._col4444_to_565(col)
+            self._mv[y * self.width + x] = col
 
     def line(self, x1, y1, x2, y2, col):
-        """Draw a vertical or horizontal line (ARGB4444)"""
         if x1 == x2:
             self.rect(x1, min(y1, y2), 1, abs(y2 - y1) + 1, col)
         elif y1 == y2:
@@ -102,14 +82,34 @@ class Framebuffer:
         else:
             raise NotImplementedError("Diagonal line drawing is not supported yet.")
 
-    def blt(self, x, y, img, u, v, w, h, colkey=-1):
+    def blt(self, x, y, img, u, v, w, h, colkey=0, tint=None):
         from .software_renderer import draw_blt
-        is_argb = getattr(img, "format", "") == "ARGB4444"
-        draw_blt(self._mv, self.width, self.height, x, y, img._mv, img.width, img.height, u, v, w, h, is_argb, colkey, byte_swap=False)
+        draw_blt(self._mv, self.width, self.height, x, y, img._mv, img.width, img.height, u, v, w, h, colkey, tint)
 
     def sprite(self, cx, cy, spr, rotate=0.0, scale=1.0):
         from .software_renderer import draw_sprite
-        draw_sprite(self._mv, self.width, self.height, cx, cy, spr.image._mv, spr.image.width, spr.image.height, spr.u, spr.v, spr.w, spr.h, spr.colkey, rotate, scale, byte_swap=False)
+        draw_sprite(self._mv, self.width, self.height, cx, cy, spr.image._mv, spr.image.width, spr.image.height, spr.u, spr.v, spr.w, spr.h, spr.colkey, rotate, scale, spr.tint)
+
+    def text(self, font, text, x, y, color=1, scale=1.0):
+        if font.format == "INDEX8":
+            dst_w = self.width
+            dst_h = self.height
+            char_w = 8
+            char_h = 12
+            
+            for i, char in enumerate(text):
+                code = ord(char)
+                if code < 32 or code > 126:
+                    code = 32
+                idx = code - 32
+                u = (idx % 16) * char_w
+                v = (idx // 16) * char_h
+                
+                cx = x + i * char_w * scale + (char_w * scale * 0.5)
+                cy = y + (char_h * scale * 0.5)
+                
+                from .software_renderer import draw_sprite
+                draw_sprite(self._mv, dst_w, dst_h, cx, cy, font._mv, 128, 72, u, v, char_w, char_h, colkey=0, scale=scale, tint=color)
 
 
 screen = Framebuffer()
@@ -119,9 +119,10 @@ _draw_func = None
 _target_fps = 30
 _proxy_tick = None
 _last_time = 0
+_palette_mv = None
 
 def _tick(time_ms):
-    global _last_time
+    global _last_time, _palette_mv
     
     # Calculate delta time
     if _last_time == 0:
@@ -141,8 +142,14 @@ def _tick(time_ms):
         if _draw_func:
             _draw_func()
             
+        if _palette_mv is None:
+            import array
+            from engine import palette
+            _palette_array = array.array('I', palette.colors)
+            _palette_mv = memoryview(_palette_array)
+            
         # Draw the framebuffer to the Canvas via our injected JS function
-        js.window.drawFramebufferWasm("gameCanvas", screen._mv)
+        js.window.drawFramebufferWasm("gameCanvas", screen._mv, _palette_mv)
         
     # Schedule the next frame
     js.window.requestAnimationFrame(_proxy_tick)

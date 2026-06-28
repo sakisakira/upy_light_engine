@@ -25,8 +25,9 @@ for _i in range(256):
     _c = (_r << 16) | (_g << 8) | _b
     colors[_i] = _c
     _v = rgb24_to_565(_c)
-    colors565[_i * 2] = _v & 0xFF
-    colors565[_i * 2 + 1] = (_v >> 8) & 0xFF
+    # Big Endian for SPI/ST7789
+    colors565[_i * 2] = (_v >> 8) & 0xFF
+    colors565[_i * 2 + 1] = _v & 0xFF
 
 class ColorsList:
     """
@@ -39,10 +40,10 @@ class ColorsList:
     def __setitem__(self, index, rgb24):
         colors[index] = rgb24
         
-        # Update internal 565 buffer (Little Endian for SPI/ST7789)
+        # Update internal 565 buffer (Big Endian for SPI/ST7789)
         val565 = rgb24_to_565(rgb24)
-        colors565[index * 2] = val565 & 0xFF
-        colors565[index * 2 + 1] = (val565 >> 8) & 0xFF
+        colors565[index * 2] = (val565 >> 8) & 0xFF
+        colors565[index * 2 + 1] = val565 & 0xFF
 
     def __len__(self):
         return 256

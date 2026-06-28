@@ -9,18 +9,22 @@ except ImportError:
 
 # JS KeyboardEvent.code mapping
 _js_to_key = {
-    "ArrowLeft": Button_Left,
-    "ArrowRight": Button_Right,
-    "ArrowUp": Button_Up,
-    "ArrowDown": Button_Down,
-    "KeyZ": Button_A,
-    "KeyX": Button_B,
-    "KeyC": Button_X,
-    "KeyV": Button_Y,
+    "KeyW": Button_Up,
+    "KeyA": Button_Left,
+    "KeyS": Button_Down,
+    "KeyD": Button_Right,
+    "KeyN": Button_A,
+    "KeyM": Button_B,
     "KeyH": Button_X,
     "KeyJ": Button_Y,
     "Space": Button_Select,
-    "Enter": Button_Start
+    "Enter": Button_Start,
+    
+    # Arrow keys as aliases for convenience
+    "ArrowLeft": Button_Left,
+    "ArrowRight": Button_Right,
+    "ArrowUp": Button_Up,
+    "ArrowDown": Button_Down
 }
 
 _key_state = {k: False for k in range(10)}

@@ -1,0 +1,27 @@
+param(
+    [string]$Port = "",
+    [switch]$Erase = $false
+)
+
+$firmware_path = "micropython\ports\esp32\build-ESP32_GENERIC_S3\firmware.bin"
+
+if (-not (Test-Path $firmware_path)) {
+    Write-Host "Error: Firmware not found at $firmware_path"
+    Write-Host "Please run scripts\build_c_module.ps1 first to build the custom firmware."
+    exit 1
+}
+
+if ($Port -eq "") {
+    Write-Host "Please specify the COM port (e.g., -Port COM4)."
+    exit 1
+}
+
+if ($Erase) {
+    Write-Host "Erasing flash..."
+    esptool --port $Port --chip esp32s3 erase_flash
+}
+
+Write-Host "Flashing firmware to Cardputer Adv on port $Port..."
+esptool --port $Port -b 460800 --before default_reset --after hard_reset --chip esp32s3 write_flash --flash_mode dio --flash_size detect --flash_freq 80m 0x0 $firmware_path
+
+Write-Host "Done! The device should now restart with the new firmware."
