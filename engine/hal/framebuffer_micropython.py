@@ -38,6 +38,12 @@ class Framebuffer(framebuf.FrameBuffer):
         w = spr.w
         h = spr.h
         
+        if rotate == 0.0 and scale == 1.0:
+            x = int(cx - w * 0.5)
+            y = int(cy - h * 0.5)
+            self.blt(x, y, spr.image, spr.u, spr.v, w, h, colkey=spr.colkey, tint=spr.tint)
+            return
+            
         if rotate == 0.0:
             half_w = w * scale * 0.5
             half_h = h * scale * 0.5
@@ -140,43 +146,79 @@ class Framebuffer(framebuf.FrameBuffer):
         
         w_half_fp = w << 7
         h_half_fp = h << 7
+        uv_base = v * src_w + u
         
-        for dy in range(min_y, max_y):
-            dist_y_fp = (dy << 8) - cy_fp
-            # -dist_y_fp * sin_inv_fp + w * 0.5
-            sx_base_fp = -((dist_y_fp * sin_inv_fp) >> 8) + w_half_fp
-            sy_base_fp = ((dist_y_fp * cos_inv_fp) >> 8) + h_half_fp
-            dst_idx_base = dy * dst_w
-            
-            for dx in range(min_x, max_x):
-                dist_x_fp = (dx << 8) - cx_fp
-                sx = ((dist_x_fp * cos_inv_fp) >> 8) + sx_base_fp
-                sx = sx >> 8
+        if tint != -1:
+            for dy in range(min_y, max_y):
+                dist_y_fp = (dy << 8) - cy_fp
+                sx_base_fp = -((dist_y_fp * sin_inv_fp) >> 8) + w_half_fp
+                sy_base_fp = ((dist_y_fp * cos_inv_fp) >> 8) + h_half_fp
+                dst_idx_base = dy * dst_w
                 
-                if sx >= 0 and sx < w:
-                    sy = ((dist_x_fp * sin_inv_fp) >> 8) + sy_base_fp
-                    sy = sy >> 8
+                dist_x_fp_start = (min_x << 8) - cx_fp
+                sx_fp = ((dist_x_fp_start * cos_inv_fp) >> 8) + sx_base_fp
+                sy_fp = ((dist_x_fp_start * sin_inv_fp) >> 8) + sy_base_fp
+                
+                for dx in range(min_x, max_x):
+                    sx = sx_fp >> 8
+                    sy = sy_fp >> 8
                     
-                    if sy >= 0 and sy < h:
-                        src_idx_base = (v + sy) * src_w + u
-                        src_val = src[src_idx_base + sx]
-                        
-                        if src_val != colkey:
-                            if tint != -1:
+                    sx_fp += cos_inv_fp
+                    sy_fp += sin_inv_fp
+                    
+                    if uint(sx) < uint(w):
+                        if uint(sy) < uint(h):
+                            src_idx = sy * src_w + uv_base + sx
+                            src_val = src[src_idx]
+                            
+                            if src_val != colkey:
                                 dst[dst_idx_base + dx] = tint
-                            else:
+        else:
+            for dy in range(min_y, max_y):
+                dist_y_fp = (dy << 8) - cy_fp
+                sx_base_fp = -((dist_y_fp * sin_inv_fp) >> 8) + w_half_fp
+                sy_base_fp = ((dist_y_fp * cos_inv_fp) >> 8) + h_half_fp
+                dst_idx_base = dy * dst_w
+                
+                dist_x_fp_start = (min_x << 8) - cx_fp
+                sx_fp = ((dist_x_fp_start * cos_inv_fp) >> 8) + sx_base_fp
+                sy_fp = ((dist_x_fp_start * sin_inv_fp) >> 8) + sy_base_fp
+                
+                for dx in range(min_x, max_x):
+                    sx = sx_fp >> 8
+                    sy = sy_fp >> 8
+                    
+                    sx_fp += cos_inv_fp
+                    sy_fp += sin_inv_fp
+                    
+                    if uint(sx) < uint(w):
+                        if uint(sy) < uint(h):
+                            src_idx = sy * src_w + uv_base + sx
+                            src_val = src[src_idx]
+                            
+                            if src_val != colkey:
                                 dst[dst_idx_base + dx] = src_val
 
     def blt(self, x, y, img, u, v, w, h, colkey=0, tint=None):
-        self._blt_viper_index8(x, y, img.buffer, img.width, u, v, w, h, colkey, -1 if tint is None else tint)
+        args = (x, y, img.width, u, v, w, h, colkey, -1 if tint is None else tint, self.width, self.height)
+        self._blt_viper_index8(self.buffer, img.buffer, args)
 
     @micropython.viper
-    def _blt_viper_index8(self, x: int, y: int, src_buf, src_w: int, u: int, v: int, w: int, h: int, colkey: int, tint: int):
-        dst = ptr8(self.buffer)
+    def _blt_viper_index8(self, dst_buf, src_buf, args):
+        dst = ptr8(dst_buf)
         src = ptr8(src_buf)
         
-        dst_w = int(self.width)
-        dst_h = int(self.height)
+        x = int(args[0])
+        y = int(args[1])
+        src_w = int(args[2])
+        u = int(args[3])
+        v = int(args[4])
+        w = int(args[5])
+        h = int(args[6])
+        colkey = int(args[7])
+        tint = int(args[8])
+        dst_w = int(args[9])
+        dst_h = int(args[10])
         
         start_x = 0
         start_y = 0
@@ -195,16 +237,23 @@ class Framebuffer(framebuf.FrameBuffer):
         if start_x >= end_x or start_y >= end_y:
             return
 
-        for i in range(start_y, end_y):
-            dst_idx_base = (y + i) * dst_w + x
-            src_idx_base = (v + i) * src_w + u
-            
-            for j in range(start_x, end_x):
-                src_val = src[src_idx_base + j]
-                if src_val != colkey:
-                    if tint != -1:
+        if tint != -1:
+            for i in range(start_y, end_y):
+                dst_idx_base = (y + i) * dst_w + x
+                src_idx_base = (v + i) * src_w + u
+                
+                for j in range(start_x, end_x):
+                    src_val = src[src_idx_base + j]
+                    if src_val != colkey:
                         dst[dst_idx_base + j] = tint
-                    else:
+        else:
+            for i in range(start_y, end_y):
+                dst_idx_base = (y + i) * dst_w + x
+                src_idx_base = (v + i) * src_w + u
+                
+                for j in range(start_x, end_x):
+                    src_val = src[src_idx_base + j]
+                    if src_val != colkey:
                         dst[dst_idx_base + j] = src_val
 
     def text(self, font, text, x, y, color=1, scale=1.0):
@@ -234,7 +283,8 @@ class Framebuffer(framebuf.FrameBuffer):
                     px = int(x + i * char_w)
                     py = int(y)
                     tint_val = -1 if color is None else color
-                    self._blt_viper_index8(px, py, font.image.buffer, font.image.width, u, v, char_w, char_h, 0, tint_val)
+                    args = (px, py, font.image.width, u, v, char_w, char_h, 0, tint_val, dst_w, dst_h)
+                    self._blt_viper_index8(self.buffer, font.image.buffer, args)
                 else:
                     cx = int(x + i * char_w * scale + (char_w * scale * 0.5))
                     cy = int(y + (char_h * scale * 0.5))

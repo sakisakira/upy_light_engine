@@ -30,8 +30,9 @@ class ST7789:
         self.reset()
         self.init_display()
         
-        # Pre-allocate line buffer to prevent MemoryError during rapid frames
-        self.line_buf = bytearray(self.width * 2)
+        # Pre-allocate chunk buffer to prevent MemoryError and reduce SPI overhead
+        self.chunk_lines = 27
+        self.chunk_buf = bytearray(self.width * self.chunk_lines * 2)
         
     def reset(self):
         """Hardware reset of the display"""
@@ -144,25 +145,29 @@ class ST7789:
         self.cs(0)
         self.dc(1)
         
-        # Use pre-allocated line buffer to prevent memory fragmentation
-        line_buf = self.line_buf
+        # Use pre-allocated chunk buffer
+        chunk_buf = self.chunk_buf
+        w = self.width
+        chunk_lines = self.chunk_lines
+        pixels_per_chunk = w * chunk_lines
         
-        self._send_lines_viper(buffer, line_buf, colors565, self.width, self.height, self.spi.write)
-        
+        start_idx = 0
+        for _ in range(self.height // chunk_lines):
+            self._send_lines_viper(buffer, chunk_buf, colors565, pixels_per_chunk, start_idx)
+            self.spi.write(chunk_buf)
+            start_idx += pixels_per_chunk
+            
         self.cs(1)
         
     @micropython.viper
-    def _send_lines_viper(self, idx_buf, line_buf, pal_buf, w: int, h: int, spi_write):
+    def _send_lines_viper(self, idx_buf, chunk_buf, pal_buf, total_pixels: int, start_idx: int):
         src = ptr8(idx_buf)
-        dst = ptr8(line_buf)
+        dst = ptr8(chunk_buf)
         pal = ptr8(pal_buf)
         
-        idx = 0
-        for y in range(h):
-            for x in range(w):
-                c = src[idx]
-                pal_idx = c << 1
-                dst[x << 1] = pal[pal_idx]
-                dst[(x << 1) + 1] = pal[pal_idx + 1]
-                idx += 1
-            spi_write(line_buf)
+        for i in range(total_pixels):
+            c = src[start_idx + i]
+            pal_idx = c << 1
+            dst_idx = i << 1
+            dst[dst_idx] = pal[pal_idx]
+            dst[dst_idx + 1] = pal[pal_idx + 1]
