@@ -17,6 +17,11 @@ class Framebuffer(framebuf.FrameBuffer):
             self.buffer = bytearray(width * height)
         else:
             self.buffer = buffer
+            
+        import array
+        self._sprite_args = array.array('i', [0] * 16)
+        self._blt_args = array.array('i', [0] * 11)
+        
         # Initialize parent class as GS8 (8-bit grayscale, we treat it as palette index)
         super().__init__(self.buffer, self.width, self.height, framebuf.GS8)
 
@@ -114,35 +119,48 @@ class Framebuffer(framebuf.FrameBuffer):
         
         tint = -1 if spr.tint is None else spr.tint
         
-        args = (
-            self.width, spr.image.width, spr.u, spr.v, w, h,
-            min_x, max_x, min_y, max_y,
-            cx_fp, cy_fp, cos_inv_fp, sin_inv_fp, spr.colkey, tint
-        )
+        a = self._sprite_args
+        a[0] = self.width
+        a[1] = spr.image.width
+        a[2] = spr.u
+        a[3] = spr.v
+        a[4] = w
+        a[5] = h
+        a[6] = min_x
+        a[7] = max_x
+        a[8] = min_y
+        a[9] = max_y
+        a[10] = cx_fp
+        a[11] = cy_fp
+        a[12] = cos_inv_fp
+        a[13] = sin_inv_fp
+        a[14] = spr.colkey
+        a[15] = tint
         
-        self._sprite_viper_fast(self.buffer, spr.image.buffer, args)
+        self._sprite_viper_fast(self.buffer, spr.image.buffer, a)
 
     @micropython.viper
-    def _sprite_viper_fast(self, dst_buf, src_buf, args):
+    def _sprite_viper_fast(self, dst_buf, src_buf, args_buf):
         dst = ptr8(dst_buf)
         src = ptr8(src_buf)
+        args = ptr32(args_buf)
         
-        dst_w = int(args[0])
-        src_w = int(args[1])
-        u = int(args[2])
-        v = int(args[3])
-        w = int(args[4])
-        h = int(args[5])
-        min_x = int(args[6])
-        max_x = int(args[7])
-        min_y = int(args[8])
-        max_y = int(args[9])
-        cx_fp = int(args[10])
-        cy_fp = int(args[11])
-        cos_inv_fp = int(args[12])
-        sin_inv_fp = int(args[13])
-        colkey = int(args[14])
-        tint = int(args[15])
+        dst_w = args[0]
+        src_w = args[1]
+        u = args[2]
+        v = args[3]
+        w = args[4]
+        h = args[5]
+        min_x = args[6]
+        max_x = args[7]
+        min_y = args[8]
+        max_y = args[9]
+        cx_fp = args[10]
+        cy_fp = args[11]
+        cos_inv_fp = args[12]
+        sin_inv_fp = args[13]
+        colkey = args[14]
+        tint = args[15]
         
         w_half_fp = w << 7
         h_half_fp = h << 7
@@ -200,25 +218,37 @@ class Framebuffer(framebuf.FrameBuffer):
                                 dst[dst_idx_base + dx] = src_val
 
     def blt(self, x, y, img, u, v, w, h, colkey=0, tint=None):
-        args = (x, y, img.width, u, v, w, h, colkey, -1 if tint is None else tint, self.width, self.height)
-        self._blt_viper_index8(self.buffer, img.buffer, args)
+        a = self._blt_args
+        a[0] = int(x)
+        a[1] = int(y)
+        a[2] = img.width
+        a[3] = u
+        a[4] = v
+        a[5] = w
+        a[6] = h
+        a[7] = colkey
+        a[8] = -1 if tint is None else tint
+        a[9] = self.width
+        a[10] = self.height
+        self._blt_viper_index8(self.buffer, img.buffer, a)
 
     @micropython.viper
-    def _blt_viper_index8(self, dst_buf, src_buf, args):
+    def _blt_viper_index8(self, dst_buf, src_buf, args_buf):
         dst = ptr8(dst_buf)
         src = ptr8(src_buf)
+        args = ptr32(args_buf)
         
-        x = int(args[0])
-        y = int(args[1])
-        src_w = int(args[2])
-        u = int(args[3])
-        v = int(args[4])
-        w = int(args[5])
-        h = int(args[6])
-        colkey = int(args[7])
-        tint = int(args[8])
-        dst_w = int(args[9])
-        dst_h = int(args[10])
+        x = args[0]
+        y = args[1]
+        src_w = args[2]
+        u = args[3]
+        v = args[4]
+        w = args[5]
+        h = args[6]
+        colkey = args[7]
+        tint = args[8]
+        dst_w = args[9]
+        dst_h = args[10]
         
         start_x = 0
         start_y = 0
@@ -283,8 +313,21 @@ class Framebuffer(framebuf.FrameBuffer):
                     px = int(x + i * char_w)
                     py = int(y)
                     tint_val = -1 if color is None else color
-                    args = (px, py, font.image.width, u, v, char_w, char_h, 0, tint_val, dst_w, dst_h)
-                    self._blt_viper_index8(self.buffer, font.image.buffer, args)
+                    
+                    a = self._blt_args
+                    a[0] = px
+                    a[1] = py
+                    a[2] = font.image.width
+                    a[3] = u
+                    a[4] = v
+                    a[5] = char_w
+                    a[6] = char_h
+                    a[7] = 0
+                    a[8] = tint_val
+                    a[9] = dst_w
+                    a[10] = dst_h
+                    
+                    self._blt_viper_index8(self.buffer, font.image.buffer, a)
                 else:
                     cx = int(x + i * char_w * scale + (char_w * scale * 0.5))
                     cy = int(y + (char_h * scale * 0.5))
@@ -312,14 +355,29 @@ def run(update, draw, fps=30):
     
     import sys
     try:
+        from engine.profiler import profiler
+        import gc
         while True:
             t0 = time.ticks_ms()
             engine_time.clock.tick()
             
+            profiler.start("update")
             update()
-            draw()
+            profiler.end("update")
             
+            profiler.start("draw_all")
+            draw()
+            profiler.end("draw_all")
+            
+            profiler.start("display_show")
             display.show(screen.buffer)
+            profiler.end("display_show")
+            
+            profiler.start("gc")
+            gc.collect()
+            profiler.end("gc")
+            print(f"[PROFILE] Free Mem: {gc.mem_free()} bytes")
+            print("-" * 20)
             
             t1 = time.ticks_ms()
             dt = time.ticks_diff(t1, t0)

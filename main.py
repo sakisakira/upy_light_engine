@@ -121,6 +121,9 @@ def update():
 
 def draw():
     from engine import input as inp
+    from engine.profiler import profiler
+    
+    profiler.start("draw_rects")
     # Fill background depending on button press
     if inp.button(inp.Button_A):
         fb.screen.fill(fb.color(136, 0, 0)) # Red for A
@@ -134,7 +137,9 @@ def draw():
         bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40
         bcol = fb.color(255, 0, 0) # Opaque Red
         fb.screen.rect(bx, by, bw, bh, bcol)
+    profiler.end("draw_rects")
 
+    profiler.start("draw_sprites")
     # Blend the sprite
     import math
     if sprite:
@@ -169,7 +174,9 @@ def draw():
     # Test line primitives (with different colors and positions so they don't overlap text)
     fb.screen.line(10, 110, 100, 110, fb.color(255, 0, 255)) # horizontal (Magenta)
     fb.screen.line(110, 80, 110, 120, fb.color(0, 255, 255)) # vertical (Cyan)
+    profiler.end("draw_sprites")
 
+    profiler.start("draw_text")
     # Test text drawing
     import engine.hal.font as font_lib
     col_yellow = fb.color(255, 255, 0)
@@ -200,6 +207,7 @@ def draw():
         w, h = font_lib.measure_text(text_str, score_font_6px)
         fb.screen.rect(fb.screen.width - w - 2, 2, w + 1, h + 1, fb.color(0, 0, 0))
         font_lib.text_shadowed(fb.screen, fb.screen.width - w - 2, 2, text_str, score_font_6px, color=col_yellow, shadow_color=fb.color(0,0,0))
+    profiler.end("draw_text")
 
 if __name__ == "__main__":
     from engine import logger
