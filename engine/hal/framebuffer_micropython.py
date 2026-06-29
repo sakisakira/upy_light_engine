@@ -4,6 +4,11 @@ try:
 except ImportError:
     pass
 
+try:
+    import graphics_engine
+except ImportError:
+    graphics_engine = None
+
 class Framebuffer(framebuf.FrameBuffer):
     """
     Screen buffer in GS8 format (used as INDEX8)
@@ -21,6 +26,7 @@ class Framebuffer(framebuf.FrameBuffer):
         import array
         self._sprite_args = array.array('i', [0] * 16)
         self._blt_args = array.array('i', [0] * 11)
+        self._fast_text = True
         
         # Initialize parent class as GS8 (8-bit grayscale, we treat it as palette index)
         super().__init__(self.buffer, self.width, self.height, framebuf.GS8)
@@ -119,25 +125,33 @@ class Framebuffer(framebuf.FrameBuffer):
         
         tint = -1 if spr.tint is None else spr.tint
         
-        a = self._sprite_args
-        a[0] = self.width
-        a[1] = spr.image.width
-        a[2] = spr.u
-        a[3] = spr.v
-        a[4] = w
-        a[5] = h
-        a[6] = min_x
-        a[7] = max_x
-        a[8] = min_y
-        a[9] = max_y
-        a[10] = cx_fp
-        a[11] = cy_fp
-        a[12] = cos_inv_fp
-        a[13] = sin_inv_fp
-        a[14] = spr.colkey
-        a[15] = tint
-        
-        self._sprite_viper_fast(self.buffer, spr.image.buffer, a)
+        if graphics_engine:
+            graphics_engine.draw_sprite(
+                self.buffer, self.width, self.height,
+                spr.image.buffer, spr.image.width, spr.image.height,
+                spr.u, spr.v, w, h, cx_fp, cy_fp, min_x, max_x, min_y, max_y,
+                cos_inv_fp, sin_inv_fp, spr.colkey, tint
+            )
+        else:
+            a = self._sprite_args
+            a[0] = self.width
+            a[1] = spr.image.width
+            a[2] = spr.u
+            a[3] = spr.v
+            a[4] = w
+            a[5] = h
+            a[6] = min_x
+            a[7] = max_x
+            a[8] = min_y
+            a[9] = max_y
+            a[10] = cx_fp
+            a[11] = cy_fp
+            a[12] = cos_inv_fp
+            a[13] = sin_inv_fp
+            a[14] = spr.colkey
+            a[15] = tint
+            
+            self._sprite_viper_fast(self.buffer, spr.image.buffer, a)
 
     @micropython.viper
     def _sprite_viper_fast(self, dst_buf, src_buf, args_buf):
@@ -218,19 +232,39 @@ class Framebuffer(framebuf.FrameBuffer):
                                 dst[dst_idx_base + dx] = src_val
 
     def blt(self, x, y, img, u, v, w, h, colkey=0, tint=None):
-        a = self._blt_args
-        a[0] = int(x)
-        a[1] = int(y)
-        a[2] = img.width
-        a[3] = u
-        a[4] = v
-        a[5] = w
-        a[6] = h
-        a[7] = colkey
-        a[8] = -1 if tint is None else tint
-        a[9] = self.width
-        a[10] = self.height
-        self._blt_viper_index8(self.buffer, img.buffer, a)
+        tint_val = -1 if tint is None else tint
+        
+        if graphics_engine:
+            cx_fp = int((x + w * 0.5) * 256)
+            cy_fp = int((y + h * 0.5) * 256)
+            min_x = max(0, int(x))
+            min_y = max(0, int(y))
+            max_x = min(self.width, int(x + w))
+            max_y = min(self.height, int(y + h))
+            
+            if min_x >= max_x or min_y >= max_y:
+                return
+                
+            graphics_engine.draw_sprite(
+                self.buffer, self.width, self.height,
+                img.buffer, img.width, img.height,
+                u, v, w, h, cx_fp, cy_fp, min_x, max_x, min_y, max_y,
+                256, 0, colkey, tint_val
+            )
+        else:
+            a = self._blt_args
+            a[0] = int(x)
+            a[1] = int(y)
+            a[2] = img.width
+            a[3] = u
+            a[4] = v
+            a[5] = w
+            a[6] = h
+            a[7] = colkey
+            a[8] = tint_val
+            a[9] = self.width
+            a[10] = self.height
+            self._blt_viper_index8(self.buffer, img.buffer, a)
 
     @micropython.viper
     def _blt_viper_index8(self, dst_buf, src_buf, args_buf):
@@ -293,6 +327,30 @@ class Framebuffer(framebuf.FrameBuffer):
             char_w = font.char_w
             char_h = font.char_h
             cols = font.cols
+            tint_val = -1 if color is None else color
+            
+            if scale == 1.0 and graphics_engine:
+                if not hasattr(font, 'lookup_table'):
+                    if font.char_map is not None:
+                        import array
+                        font.lookup_table = array.array('h', [-1] * 256)
+                        for code, idx in font.char_map.items():
+                            if code < 256:
+                                font.lookup_table[code] = idx
+                    else:
+                        font.lookup_table = None
+                        
+                text_bytes = text.encode('ascii', 'ignore')
+                
+                graphics_engine.draw_text_fast(
+                    self.buffer, dst_w, dst_h,
+                    font.image.buffer, font.image.width,
+                    char_w, char_h, cols,
+                    text_bytes, len(text_bytes),
+                    font.lookup_table,
+                    int(x), int(y), tint_val
+                )
+                return
             
             for i, char in enumerate(text):
                 code = ord(char)
@@ -312,7 +370,6 @@ class Framebuffer(framebuf.FrameBuffer):
                 if scale == 1.0:
                     px = int(x + i * char_w)
                     py = int(y)
-                    tint_val = -1 if color is None else color
                     
                     a = self._blt_args
                     a[0] = px
@@ -373,11 +430,9 @@ def run(update, draw, fps=30):
             display.show(screen.buffer)
             profiler.end("display_show")
             
-            profiler.start("gc")
-            gc.collect()
-            profiler.end("gc")
-            print(f"[PROFILE] Free Mem: {gc.mem_free()} bytes")
-            print("-" * 20)
+            # Print free memory every 60 frames to monitor leaks
+            if engine_time.clock.frame_count % 60 == 0:
+                print(f"FPS: {engine_time.clock.fps} | Free Mem: {gc.mem_free()} bytes")
             
             t1 = time.ticks_ms()
             dt = time.ticks_diff(t1, t0)

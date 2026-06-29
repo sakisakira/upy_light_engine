@@ -69,6 +69,18 @@ def create_triangle_image(width, height):
             
     return Image(width, height, buf)
 
+# --- Cached Colors ---
+COL_BG_A = None
+COL_BG_B = None
+COL_BG_DEF = None
+COL_RED = None
+COL_WHITE = None
+COL_MAGENTA = None
+COL_CYAN = None
+COL_YELLOW = None
+COL_GRAY = None
+COL_BLACK = None
+
 # --- Game State ---
 x = 100
 y = 50
@@ -121,21 +133,25 @@ def update():
 
 def draw():
     from engine import input as inp
-    from engine.profiler import profiler
+    try:
+        from engine.profiler import profiler
+        profiler.enabled = False # Disable by default to save print overhead
+    except ImportError:
+        pass
     
     profiler.start("draw_rects")
     # Fill background depending on button press
     if inp.button(inp.Button_A):
-        fb.screen.fill(fb.color(136, 0, 0)) # Red for A
+        fb.screen.fill(COL_BG_A) # Red for A
     elif inp.button(inp.Button_B):
-        fb.screen.fill(fb.color(0, 136, 0)) # Green for B
+        fb.screen.fill(COL_BG_B) # Green for B
     else:
-        fb.screen.fill(fb.color(0, 0, 136)) # Default dark blue
+        fb.screen.fill(COL_BG_DEF) # Default dark blue
 
     # Draw multiple rectangles to easily check if alpha blending works
     for i in range(5):
         bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40
-        bcol = fb.color(255, 0, 0) # Opaque Red
+        bcol = COL_RED # Opaque Red
         fb.screen.rect(bx, by, bw, bh, bcol)
     profiler.end("draw_rects")
 
@@ -169,35 +185,34 @@ def draw():
         fb.screen.sprite(cx_tri, cy_tri, sprite_triangle, rotate=rot, scale=tri_scale)
 
     # Test pset
-    fb.screen.pset(10, 10, fb.color(255, 255, 255))
+    fb.screen.pset(10, 10, COL_WHITE)
     
     # Test line primitives (with different colors and positions so they don't overlap text)
-    fb.screen.line(10, 110, 100, 110, fb.color(255, 0, 255)) # horizontal (Magenta)
-    fb.screen.line(110, 80, 110, 120, fb.color(0, 255, 255)) # vertical (Cyan)
+    fb.screen.line(10, 110, 100, 110, COL_MAGENTA) # horizontal (Magenta)
+    fb.screen.line(110, 80, 110, 120, COL_CYAN) # vertical (Cyan)
     profiler.end("draw_sprites")
 
     profiler.start("draw_text")
     # Test text drawing
     import engine.hal.font as font_lib
-    col_yellow = fb.color(255, 255, 0)
     if score_font:
-        font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font, col_yellow)
+        font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font, COL_YELLOW)
     if score_font_half:
-        font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half, col_yellow)
+        font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half, COL_YELLOW)
     if score_font_6px:
         # Measure text first
         text_str = "SCORE 1234 (6PX PIXEL FONT)"
         w, h = font_lib.measure_text(text_str, score_font_6px)
         
         # Draw a dark gray background rectangle exactly matching the text bounds
-        fb.screen.rect(80, 80, w + 1, h + 1, fb.color(50, 50, 50))
-        font_lib.text_shadowed(fb.screen, 80, 80, text_str, score_font_6px, color=col_yellow, shadow_color=fb.color(0,0,0))
+        fb.screen.rect(80, 80, w + 1, h + 1, COL_GRAY)
+        font_lib.text_shadowed(fb.screen, 80, 80, text_str, score_font_6px, color=COL_YELLOW, shadow_color=COL_BLACK)
         
     if score_font_16px:
         text_str_16 = "HELLO 16PX FONT!"
         w16, h16 = font_lib.measure_text(text_str_16, score_font_16px)
-        fb.screen.rect(10, 100, w16, h16, fb.color(50, 50, 50))
-        font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px, fb.color(255, 255, 255))
+        fb.screen.rect(10, 100, w16, h16, COL_GRAY)
+        font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px, COL_WHITE)
 
     from engine.time import clock
     if score_font_6px:
@@ -205,8 +220,8 @@ def draw():
         if clock.is_paused:
             text_str += " (PAUSED)"
         w, h = font_lib.measure_text(text_str, score_font_6px)
-        fb.screen.rect(fb.screen.width - w - 2, 2, w + 1, h + 1, fb.color(0, 0, 0))
-        font_lib.text_shadowed(fb.screen, fb.screen.width - w - 2, 2, text_str, score_font_6px, color=col_yellow, shadow_color=fb.color(0,0,0))
+        fb.screen.rect(fb.screen.width - w - 2, 2, w + 1, h + 1, COL_BLACK)
+        font_lib.text_shadowed(fb.screen, fb.screen.width - w - 2, 2, text_str, score_font_6px, color=COL_YELLOW, shadow_color=COL_BLACK)
     profiler.end("draw_text")
 
 if __name__ == "__main__":
@@ -217,6 +232,19 @@ if __name__ == "__main__":
     try:
         from engine import palette
         palette.load_palette("assets/images/palette.bin")
+        
+        # Initialize color constants once
+        COL_BG_A = fb.color(136, 0, 0)
+        COL_BG_B = fb.color(0, 136, 0)
+        COL_BG_DEF = fb.color(0, 0, 136)
+        COL_RED = fb.color(255, 0, 0)
+        COL_WHITE = fb.color(255, 255, 255)
+        COL_MAGENTA = fb.color(255, 0, 255)
+        COL_CYAN = fb.color(0, 255, 255)
+        COL_YELLOW = fb.color(255, 255, 0)
+        COL_GRAY = fb.color(50, 50, 50)
+        COL_BLACK = fb.color(0, 0, 0)
+        
         img_sprite = Image.load("assets/images/test_sprite.uimg")
     except Exception as e:
         logger.error(f"Failed to load uimg or palette: {e}")

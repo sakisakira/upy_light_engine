@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MicroPython C Native Modules
+*.mpy
+*.o
+build-xtensawin/

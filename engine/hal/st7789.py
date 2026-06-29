@@ -6,7 +6,7 @@ class ST7789:
     Pure Python ST7789 SPI Display Driver for Cardputer (240x135)
     Optimized for high-speed framebuffer transfer.
     """
-    def __init__(self, spi_id=1, baudrate=40000000, 
+    def __init__(self, spi_id=1, baudrate=80000000, 
                  mosi=35, sck=36, cs=37, dc=34, rst=33, bl=38, 
                  width=240, height=135):
         import micropython
@@ -14,9 +14,12 @@ class ST7789:
         self.height = height
         
         # Hardware SPI initialization
-        self.spi = machine.SPI(spi_id, baudrate=baudrate, 
-                               sck=machine.Pin(sck), mosi=machine.Pin(mosi))
-        
+        self.spi = machine.SPI(
+            spi_id,
+            baudrate=baudrate,
+            sck=machine.Pin(sck),
+            mosi=machine.Pin(mosi)
+        )
         # Pin initialization
         self.cs = machine.Pin(cs, machine.Pin.OUT)
         self.dc = machine.Pin(dc, machine.Pin.OUT)
@@ -140,6 +143,11 @@ class ST7789:
         """Fast transfer of the INDEX8 framebuffer to the display using colors565 palette"""
         from ..palette import colors565
         
+        try:
+            import graphics_engine
+        except ImportError:
+            graphics_engine = None
+        
         self.set_window(0, 0, self.width - 1, self.height - 1)
         
         self.cs(0)
@@ -153,7 +161,10 @@ class ST7789:
         
         start_idx = 0
         for _ in range(self.height // chunk_lines):
-            self._send_lines_viper(buffer, chunk_buf, colors565, pixels_per_chunk, start_idx)
+            if graphics_engine:
+                graphics_engine.convert_palette_chunk(buffer, start_idx, chunk_buf, colors565, pixels_per_chunk)
+            else:
+                self._send_lines_viper(buffer, chunk_buf, colors565, pixels_per_chunk, start_idx)
             self.spi.write(chunk_buf)
             start_idx += pixels_per_chunk
             

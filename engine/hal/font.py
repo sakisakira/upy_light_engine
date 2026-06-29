@@ -46,35 +46,23 @@ class Font:
 
 def measure_text(string, font, spacing=0):
     """
-    Calculate the bounding box of the text if it were drawn.
-    Returns (width, height).
+    Measure the pixel width and height of a string using the specified Font.
     """
-    w = 0
-    h = font.char_h if string else 0
-    current_w = 0
+    if not string:
+        return 0, 0
+        
+    lines = string.split('\n')
+    h = len(lines) * font.char_h
     
-    for char in string:
-        if char == '\n':
-            if current_w > w:
-                w = current_w
-            current_w = 0
-            h += font.char_h
-        else:
-            code = ord(char)
-            if font.char_map is not None:
-                if code in font.char_map:
-                    current_w += font.char_w + spacing
-            else:
-                if 0x20 <= code <= 0x7E:
-                    current_w += font.char_w + spacing
-                
-    if current_w > w:
-        w = current_w
+    max_chars = 0
+    for line in lines:
+        if len(line) > max_chars:
+            max_chars = len(line)
+            
+    if max_chars == 0:
+        return 0, h
         
-    # Remove the extra spacing at the end of the longest line if length > 0
-    if w > 0:
-        w -= spacing
-        
+    w = max_chars * (font.char_w + spacing) - spacing
     return w, h
 
 def text(fb, x, y, string, font, color=None, spacing=0):
@@ -83,6 +71,11 @@ def text(fb, x, y, string, font, color=None, spacing=0):
     ASCII range 0x20 to 0x7E is supported.
     spacing: extra pixels (can be negative) to add between characters.
     """
+    # Delegate to optimized C module if available
+    if hasattr(fb, '_fast_text') and spacing == 0:
+        fb.text(font, string, x, y, color=color, scale=1.0)
+        return
+
     cx = x
     cy = y
     for char in string:

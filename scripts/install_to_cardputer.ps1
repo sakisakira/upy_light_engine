@@ -35,7 +35,14 @@ if ($img_files) {
     mpremote @mpremote_args cp $img_files :assets/images/
 }
 
-# 4. main.py のコピー
+# 4. ネイティブモジュール(.mpy)のコピー
+Write-Host "Copying native modules (.mpy)..."
+$mpy_files = Get-ChildItem -Path .\*.mpy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+if ($mpy_files) {
+    mpremote @mpremote_args cp $mpy_files :
+}
+
+# 5. main.py のコピー
 Write-Host "Copying main.py..."
 mpremote @mpremote_args cp .\main.py :
 

@@ -11,6 +11,12 @@ def color(r, g, b, a=255):
     """
     Utility to find the nearest INDEX8 palette color from RGB.
     If a < 128, returns 0 (colorkey).
+    
+    WARNING: This function performs an expensive pure Python search 
+    over the 256-color palette (up to 255 iterations). 
+    DO NOT call this inside a game loop (e.g. inside draw()).
+    Instead, pre-calculate the color at initialization and cache 
+    the resulting index integer in your game script!
     """
     if a < 128:
         return 0
@@ -30,4 +36,5 @@ def color(r, g, b, a=255):
             best_idx = i
             if dist == 0:
                 break
+                
     return best_idx
