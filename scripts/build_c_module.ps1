@@ -33,7 +33,7 @@ echo '--- mpy-cross build ---';
 make -C micropython/mpy-cross;
 echo '--- C module build ---';
 make -C micropython/ports/esp32 BOARD=ESP32_GENERIC_S3 submodules;
-make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/sound_engine/micropython.cmake BOARD=ESP32_GENERIC_S3;
+make -C micropython/ports/esp32 USER_C_MODULES=/workspace/c_modules/micropython.cmake BOARD=ESP32_GENERIC_S3;
 "@
 
 docker run --rm -v "${WORKSPACE_DIR}:/workspace" -w /workspace $IMAGE_NAME bash -c $BUILD_COMMAND

@@ -75,7 +75,9 @@ typedef struct {
         struct {
             int16_t cx, cy;
             float scale;
-            EngineSprite *sprite;
+            EngineImage *img;
+            int16_t u, v, w, h;
+            uint16_t colkey;
             int tint;
         } draw_sprite;
         struct {

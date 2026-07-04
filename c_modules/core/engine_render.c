@@ -113,25 +113,23 @@ static void render_blt(EngineFramebuffer *framebuffer, int16_t x, int16_t y, Eng
 }
 
 static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx, int16_t cy,
-                               float scale, EngineSprite *sprite, int tint) {
+                               float scale, EngineImage *img,
+                               int16_t u, int16_t v, int16_t w, int16_t h,
+                               uint16_t colkey_in, int tint) {
     if (framebuffer->format != kFormatIndex8) {
         assert(0 && "Unsupported framebuffer format in render_draw_sprite");
         return;
     }
     if (scale <= 0.0f) return;
-    if (sprite->image == NULL) return;
+    if (img == NULL) return;
 
     int dst_w = framebuffer->width;
     int dst_h = framebuffer->height;
-    int src_w = sprite->image->width;
-    int u = sprite->u;
-    int v = sprite->v;
-    int w = sprite->w;
-    int h = sprite->h;
-    uint8_t colkey = (uint8_t)sprite->colkey;
+    int src_w = img->width;
+    uint8_t colkey = (uint8_t)colkey_in;
 
     uint8_t *dst = framebuffer->buffer;
-    uint8_t *src = sprite->image->data;
+    uint8_t *src = img->data;
 
     float inv_scale = 1.0f / scale;
     int cos_inv_fp = (int)(inv_scale * 256.0f);
@@ -269,8 +267,10 @@ void render_display_list(EngineFramebuffer *framebuffer, DisplayList *display_li
                 break;
             case kCmdDrawSprite:
                 render_draw_sprite(framebuffer, cmd->args.draw_sprite.cx, cmd->args.draw_sprite.cy,
-                                   cmd->args.draw_sprite.scale, cmd->args.draw_sprite.sprite,
-                                   cmd->args.draw_sprite.tint);
+                                   cmd->args.draw_sprite.scale, cmd->args.draw_sprite.img,
+                                   cmd->args.draw_sprite.u, cmd->args.draw_sprite.v,
+                                   cmd->args.draw_sprite.w, cmd->args.draw_sprite.h,
+                                   cmd->args.draw_sprite.colkey, cmd->args.draw_sprite.tint);
                 break;
             case kCmdDrawText:
                 render_draw_text(framebuffer, cmd->args.draw_text.x, cmd->args.draw_text.y, cmd->args.draw_text.font,

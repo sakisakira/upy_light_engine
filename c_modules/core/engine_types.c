@@ -86,7 +86,12 @@ void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy,
     cmd->args.draw_sprite.cx = cx;
     cmd->args.draw_sprite.cy = cy;
     cmd->args.draw_sprite.scale = scale;
-    cmd->args.draw_sprite.sprite = sprite;
+    cmd->args.draw_sprite.img = sprite->image;
+    cmd->args.draw_sprite.u = sprite->u;
+    cmd->args.draw_sprite.v = sprite->v;
+    cmd->args.draw_sprite.w = sprite->w;
+    cmd->args.draw_sprite.h = sprite->h;
+    cmd->args.draw_sprite.colkey = sprite->colkey;
     cmd->args.draw_sprite.tint = tint;
 }
 

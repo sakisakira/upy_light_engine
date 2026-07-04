@@ -102,7 +102,7 @@ static mp_obj_t sound_engine_init(void) {
     // Initialize I2S
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_MASTER);
     esp_err_t err = i2s_new_channel(&chan_cfg, &tx_chan, NULL);
-    if (err != ESP_OK) mp_raise_msg(&mp_type_RuntimeError, "Failed to create I2S channel");
+    if (err != ESP_OK) mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to create I2S channel"));
 
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(44100),
