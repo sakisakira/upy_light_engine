@@ -9,7 +9,7 @@ void convert_palette_chunk(uint8_t *src, uint16_t *dst, uint16_t *pal, int num_p
 }
 
 static void render_clear(EngineFramebuffer *framebuffer, uint16_t color) {
-    if (framebuffer->format == FORMAT_INDEX8) {
+    if (framebuffer->format == kFormatIndex8) {
         uint8_t c8 = (uint8_t)color;
         int total = framebuffer->width * framebuffer->height;
         for (int i = 0; i < total; i++) {
@@ -29,7 +29,7 @@ static void render_fill_rect(EngineFramebuffer *framebuffer, int16_t x, int16_t 
 
     if (start_x >= end_x || start_y >= end_y) return;
 
-    if (framebuffer->format == FORMAT_INDEX8) {
+    if (framebuffer->format == kFormatIndex8) {
         uint8_t c8 = (uint8_t)color;
         for (int row = start_y; row < end_y; row++) {
             int idx = row * framebuffer->width + start_x;
@@ -44,7 +44,7 @@ static void render_fill_rect(EngineFramebuffer *framebuffer, int16_t x, int16_t 
 
 static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx, int16_t cy,
                                float scale, EngineSprite *sprite, int tint) {
-    if (framebuffer->format != FORMAT_INDEX8) {
+    if (framebuffer->format != kFormatIndex8) {
         assert(0 && "Unsupported framebuffer format in render_draw_sprite");
         return;
     }
@@ -118,7 +118,7 @@ static void render_draw_text(EngineFramebuffer *framebuffer, int16_t x, int16_t 
                              int char_w, int char_h, int columns,
                              const uint8_t *text, int text_len,
                              int16_t *lookup, int tint) {
-    if (framebuffer->format != FORMAT_INDEX8) {
+    if (framebuffer->format != kFormatIndex8) {
         assert(0 && "Unsupported framebuffer format in render_draw_text");
         return;
     }
@@ -170,9 +170,9 @@ static void render_draw_text(EngineFramebuffer *framebuffer, int16_t x, int16_t 
 
 void render_display_list(EngineFramebuffer *framebuffer, DisplayList *display_list) {
     if (framebuffer == NULL || display_list == NULL) return;
-    if (framebuffer->format != FORMAT_INDEX8) {
+    if (framebuffer->format != kFormatIndex8) {
         assert(0 && "Unsupported framebuffer format in render_display_list");
-        return; // Currently only INDEX8 supported for drawing
+        return; // Currently only kFormatIndex8 supported for drawing
     }
 
     for (int i = 0; i < display_list->count; i++) {

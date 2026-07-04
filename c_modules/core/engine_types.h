@@ -4,9 +4,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define FORMAT_RGB565  0
-#define FORMAT_ARGB4444 1
-#define FORMAT_INDEX8   2
+enum {
+    kFormatRgb565 = 0,
+    kFormatArgb4444 = 1,
+    kFormatIndex8 = 2
+};
 
 // --- Data Structures ---
 
