@@ -1,5 +1,16 @@
 #include "engine_types.h"
 #include <stddef.h>
+#include <stdlib.h>
+
+DisplayList* dl_create(void) {
+    DisplayList* dl = (DisplayList*)malloc(sizeof(DisplayList));
+    if (dl) dl_init(dl);
+    return dl;
+}
+
+void dl_destroy(DisplayList *display_list) {
+    if (display_list) free(display_list);
+}
 
 void dl_init(DisplayList *display_list) {
     if (display_list != NULL) {
@@ -20,6 +31,26 @@ void dl_push_clear(DisplayList *display_list, uint16_t color) {
     cmd->args.clear.color = color;
 }
 
+void dl_push_pset(DisplayList *display_list, int16_t x, int16_t y, uint16_t color) {
+    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    RenderCommand *cmd = &display_list->commands[display_list->count++];
+    cmd->type = kCmdPset;
+    cmd->args.pset.x = x;
+    cmd->args.pset.y = y;
+    cmd->args.pset.color = color;
+}
+
+void dl_push_line(DisplayList *display_list, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
+    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    RenderCommand *cmd = &display_list->commands[display_list->count++];
+    cmd->type = kCmdLine;
+    cmd->args.line.x1 = x1;
+    cmd->args.line.y1 = y1;
+    cmd->args.line.x2 = x2;
+    cmd->args.line.y2 = y2;
+    cmd->args.line.color = color;
+}
+
 void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y,
                        int16_t w, int16_t h, uint16_t color) {
     if (display_list == NULL || display_list->count >= kMaxCommands) return;
@@ -30,6 +61,21 @@ void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y,
     cmd->args.fill_rect.w = w;
     cmd->args.fill_rect.h = h;
     cmd->args.fill_rect.color = color;
+}
+
+void dl_push_blt(DisplayList *display_list, int16_t x, int16_t y, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint) {
+    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    RenderCommand *cmd = &display_list->commands[display_list->count++];
+    cmd->type = kCmdBlt;
+    cmd->args.blt.x = x;
+    cmd->args.blt.y = y;
+    cmd->args.blt.img = img;
+    cmd->args.blt.u = u;
+    cmd->args.blt.v = v;
+    cmd->args.blt.w = w;
+    cmd->args.blt.h = h;
+    cmd->args.blt.colkey = colkey;
+    cmd->args.blt.tint = tint;
 }
 
 void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy,

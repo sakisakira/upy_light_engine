@@ -1,6 +1,8 @@
 #include "engine_render.h"
 #include <stddef.h>
+#include <math.h>
 #include <assert.h>
+#include <stdlib.h>
 
 void convert_palette_chunk(uint8_t *src, uint16_t *dst, uint16_t *pal, int num_pixels) {
     for (int i = 0; i < num_pixels; i++) {
@@ -17,6 +19,44 @@ static void render_clear(EngineFramebuffer *framebuffer, uint16_t color) {
         }
     } else {
         assert(0 && "Unsupported framebuffer format in render_clear");
+    }
+}
+
+static void render_pset(EngineFramebuffer *framebuffer, int16_t x, int16_t y, uint16_t color) {
+    if (framebuffer->format != kFormatIndex8) {
+        assert(0 && "Unsupported framebuffer format in render_pset");
+        return;
+    }
+    if (x >= 0 && x < framebuffer->width && y >= 0 && y < framebuffer->height) {
+        framebuffer->buffer[y * framebuffer->width + x] = (uint8_t)color;
+    }
+}
+
+static void render_line(EngineFramebuffer *framebuffer, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
+    if (framebuffer->format != kFormatIndex8) {
+        assert(0 && "Unsupported framebuffer format in render_line");
+        return;
+    }
+    int dx = abs(x2 - x1);
+    int sx = x1 < x2 ? 1 : -1;
+    int dy = -abs(y2 - y1);
+    int sy = y1 < y2 ? 1 : -1;
+    int err = dx + dy;
+    
+    while (1) {
+        if (x1 >= 0 && x1 < framebuffer->width && y1 >= 0 && y1 < framebuffer->height) {
+            framebuffer->buffer[y1 * framebuffer->width + x1] = (uint8_t)color;
+        }
+        if (x1 == x2 && y1 == y2) break;
+        int e2 = 2 * err;
+        if (e2 >= dy) {
+            err += dy;
+            x1 += sx;
+        }
+        if (e2 <= dx) {
+            err += dx;
+            y1 += sy;
+        }
     }
 }
 
@@ -39,6 +79,36 @@ static void render_fill_rect(EngineFramebuffer *framebuffer, int16_t x, int16_t 
         }
     } else {
         assert(0 && "Unsupported framebuffer format in render_fill_rect");
+    }
+}
+
+static void render_blt(EngineFramebuffer *framebuffer, int16_t x, int16_t y, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint) {
+    if (framebuffer->format != kFormatIndex8 || img->format != kFormatIndex8) {
+        assert(0 && "Unsupported format in render_blt");
+        return;
+    }
+    
+    int16_t start_x = (x < 0) ? 0 : x;
+    int16_t start_y = (y < 0) ? 0 : y;
+    int16_t end_x = (x + w > framebuffer->width) ? framebuffer->width : x + w;
+    int16_t end_y = (y + h > framebuffer->height) ? framebuffer->height : y + h;
+    
+    if (start_x >= end_x || start_y >= end_y) return;
+    
+    for (int i = start_y; i < end_y; i++) {
+        int dst_idx_base = i * framebuffer->width + x;
+        int src_idx_base = (v + (i - y)) * img->width + u;
+        
+        for (int j = start_x; j < end_x; j++) {
+            uint8_t src_val = img->data[src_idx_base + (j - x)];
+            if (src_val != colkey) {
+                if (tint >= 0) {
+                    framebuffer->buffer[dst_idx_base + (j - x)] = (uint8_t)tint;
+                } else {
+                    framebuffer->buffer[dst_idx_base + (j - x)] = src_val;
+                }
+            }
+        }
     }
 }
 
@@ -181,10 +251,21 @@ void render_display_list(EngineFramebuffer *framebuffer, DisplayList *display_li
             case kCmdClear:
                 render_clear(framebuffer, cmd->args.clear.color);
                 break;
+            case kCmdPset:
+                render_pset(framebuffer, cmd->args.pset.x, cmd->args.pset.y, cmd->args.pset.color);
+                break;
+            case kCmdLine:
+                render_line(framebuffer, cmd->args.line.x1, cmd->args.line.y1, cmd->args.line.x2, cmd->args.line.y2, cmd->args.line.color);
+                break;
             case kCmdFillRect:
                 render_fill_rect(framebuffer, cmd->args.fill_rect.x, cmd->args.fill_rect.y,
                                  cmd->args.fill_rect.w, cmd->args.fill_rect.h,
                                  cmd->args.fill_rect.color);
+                break;
+            case kCmdBlt:
+                render_blt(framebuffer, cmd->args.blt.x, cmd->args.blt.y,
+                           cmd->args.blt.img, cmd->args.blt.u, cmd->args.blt.v,
+                           cmd->args.blt.w, cmd->args.blt.h, cmd->args.blt.colkey, cmd->args.blt.tint);
                 break;
             case kCmdDrawSprite:
                 render_draw_sprite(framebuffer, cmd->args.draw_sprite.cx, cmd->args.draw_sprite.cy,

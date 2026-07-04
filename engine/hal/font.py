@@ -43,6 +43,20 @@ class Font:
             f.readinto(pixel_data)
             
         self.image = Image(img_w, img_h, pixel_data)
+        
+        if sys.platform not in ('esp32', 'emscripten'):
+            import ctypes
+            self._c_lookup = (ctypes.c_int16 * 256)()
+            for i in range(256):
+                self._c_lookup[i] = -1
+                
+            if self.char_map is not None:
+                for cp, idx in self.char_map.items():
+                    if 0 <= cp < 256:
+                        self._c_lookup[cp] = idx
+            else:
+                for cp in range(0x20, 0x7E + 1):
+                    self._c_lookup[cp] = cp - 0x20
 
 def measure_text(string, font, spacing=0):
     """

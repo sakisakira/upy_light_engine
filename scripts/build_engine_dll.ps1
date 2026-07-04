@@ -1,0 +1,21 @@
+$ErrorActionPreference = "Stop"
+
+# Ensure we are in the project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$projectRoot = Resolve-Path (Join-Path $scriptDir "..")
+Set-Location $projectRoot
+
+# Create build directory
+if (-not (Test-Path "build")) {
+    New-Item -ItemType Directory -Path "build" | Out-Null
+}
+
+Write-Host "Building core_engine.dll..."
+gcc -shared -o build/core_engine.dll c_modules/core/engine_types.c c_modules/core/engine_render.c -I c_modules/core -O3 -Wall
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Successfully built build/core_engine.dll" -ForegroundColor Green
+} else {
+    Write-Host "Build failed!" -ForegroundColor Red
+    exit 1
+}

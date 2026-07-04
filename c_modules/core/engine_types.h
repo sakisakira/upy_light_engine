@@ -39,7 +39,10 @@ typedef struct {
 
 typedef enum {
     kCmdClear,
+    kCmdPset,
+    kCmdLine,
     kCmdFillRect,
+    kCmdBlt,
     kCmdDrawSprite,
     kCmdDrawText
 } CommandType;
@@ -51,9 +54,24 @@ typedef struct {
             uint16_t color;
         } clear;
         struct {
+            int16_t x, y;
+            uint16_t color;
+        } pset;
+        struct {
+            int16_t x1, y1, x2, y2;
+            uint16_t color;
+        } line;
+        struct {
             int16_t x, y, w, h;
             uint16_t color;
         } fill_rect;
+        struct {
+            int16_t x, y;
+            EngineImage *img;
+            int16_t u, v, w, h;
+            uint16_t colkey;
+            int tint;
+        } blt;
         struct {
             int16_t cx, cy;
             float scale;
@@ -82,16 +100,18 @@ typedef struct {
 // --- API ---
 
 // Initialize a display list
+DisplayList* dl_create(void);
+void dl_destroy(DisplayList *display_list);
+
 void dl_init(DisplayList *display_list);
-// Clear the display list
 void dl_clear(DisplayList *display_list);
 
-// Add commands
 void dl_push_clear(DisplayList *display_list, uint16_t color);
-void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y,
-                       int16_t w, int16_t h, uint16_t color);
-void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy,
-                         float scale, EngineSprite *sprite, int tint);
+void dl_push_pset(DisplayList *display_list, int16_t x, int16_t y, uint16_t color);
+void dl_push_line(DisplayList *display_list, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+void dl_push_blt(DisplayList *display_list, int16_t x, int16_t y, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint);
+void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy, float scale, EngineSprite *sprite, int tint);
 void dl_push_draw_text(DisplayList *display_list, int16_t x, int16_t y, EngineImage *font,
                        int char_w, int char_h, int columns,
                        const uint8_t *text, int text_len,

@@ -10,13 +10,21 @@ class Image:
         self.height = height
         self.format = "INDEX8"
         if buffer is None:
-            self.buffer = bytearray(width * height)
+            self.data = bytearray(width * height)
         else:
-            self.buffer = buffer
-            
-        # CPython software rendering optimization (1 byte per pixel = B)
-        if sys.implementation.name != 'micropython':
-            self._mv = memoryview(self.buffer).cast('B')
+            self.data = buffer
+        self._mv = memoryview(self.data).cast('B')
+        
+        import sys
+        if sys.platform not in ('esp32', 'emscripten'):
+            from .hal.engine_cpython import CEngineImage
+            import ctypes
+            self._c_image = CEngineImage()
+            self._c_image.width = self.width
+            self._c_image.height = self.height
+            self._c_image.format = 2 # kFormatIndex8
+            self._c_data = (ctypes.c_uint8 * len(self.data)).from_buffer(self.data)
+            self._c_image.data = ctypes.cast(self._c_data, ctypes.POINTER(ctypes.c_uint8))
 
     _cache = {}
 

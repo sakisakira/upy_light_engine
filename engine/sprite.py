@@ -11,3 +11,16 @@ class Sprite:
         self.h = int(h)
         self.colkey = colkey
         self.tint = tint
+        
+        import sys
+        if sys.platform not in ('esp32', 'emscripten'):
+            from .hal.engine_cpython import CEngineSprite
+            import ctypes
+            self._c_sprite = CEngineSprite()
+            if hasattr(self.image, '_c_image'):
+                self._c_sprite.image = ctypes.pointer(self.image._c_image)
+            self._c_sprite.u = self.u
+            self._c_sprite.v = self.v
+            self._c_sprite.w = self.w
+            self._c_sprite.h = self.h
+            self._c_sprite.colkey = self.colkey
