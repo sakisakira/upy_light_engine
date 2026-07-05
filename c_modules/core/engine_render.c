@@ -238,13 +238,26 @@ static void render_draw_text(EngineFramebuffer *framebuffer, int16_t x, int16_t 
 
         if (draw_start_x >= draw_end_x || draw_start_y >= draw_end_y) continue;
 
-        for (int row = draw_start_y; row < draw_end_y; row++) {
-            int dst_idx_base = (py + row) * dst_w + px;
-            int src_idx_base = (v + row) * font_w + u;
-            for (int col = draw_start_x; col < draw_end_x; col++) {
-                uint8_t src_val = font_buf[src_idx_base + col];
-                if (src_val != 0) { // colkey is 0 for fonts
-                    dst[dst_idx_base + col] = (tint != -1) ? (uint8_t)tint : src_val;
+        if (tint != -1) {
+            uint8_t t = (uint8_t)tint;
+            for (int row = draw_start_y; row < draw_end_y; row++) {
+                int dst_idx_base = (py + row) * dst_w + px;
+                int src_idx_base = (v + row) * font_w + u;
+                for (int col = draw_start_x; col < draw_end_x; col++) {
+                    if (font_buf[src_idx_base + col] != 0) {
+                        dst[dst_idx_base + col] = t;
+                    }
+                }
+            }
+        } else {
+            for (int row = draw_start_y; row < draw_end_y; row++) {
+                int dst_idx_base = (py + row) * dst_w + px;
+                int src_idx_base = (v + row) * font_w + u;
+                for (int col = draw_start_x; col < draw_end_x; col++) {
+                    uint8_t src_val = font_buf[src_idx_base + col];
+                    if (src_val != 0) {
+                        dst[dst_idx_base + col] = src_val;
+                    }
                 }
             }
         }
