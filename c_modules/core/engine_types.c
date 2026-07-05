@@ -1,7 +1,7 @@
 #include "engine_types.h"
 #include <stddef.h>
 #include <stdlib.h>
-
+#include <assert.h>
 DisplayList* dl_create(void) {
     DisplayList* dl = (DisplayList*)malloc(sizeof(DisplayList));
     if (dl) dl_init(dl);
@@ -25,14 +25,16 @@ void dl_clear(DisplayList *display_list) {
 }
 
 void dl_push_clear(DisplayList *display_list, uint16_t color) {
-    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdClear;
     cmd->args.clear.color = color;
 }
 
 void dl_push_pset(DisplayList *display_list, int16_t x, int16_t y, uint16_t color) {
-    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdPset;
     cmd->args.pset.x = x;
@@ -41,7 +43,8 @@ void dl_push_pset(DisplayList *display_list, int16_t x, int16_t y, uint16_t colo
 }
 
 void dl_push_line(DisplayList *display_list, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
-    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdLine;
     cmd->args.line.x1 = x1;
@@ -53,7 +56,8 @@ void dl_push_line(DisplayList *display_list, int16_t x1, int16_t y1, int16_t x2,
 
 void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y,
                        int16_t w, int16_t h, uint16_t color) {
-    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdFillRect;
     cmd->args.fill_rect.x = x;
@@ -64,7 +68,8 @@ void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y,
 }
 
 void dl_push_blt(DisplayList *display_list, int16_t x, int16_t y, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint) {
-    if (display_list == NULL || display_list->count >= kMaxCommands) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdBlt;
     cmd->args.blt.x = x;
@@ -78,20 +83,22 @@ void dl_push_blt(DisplayList *display_list, int16_t x, int16_t y, EngineImage *i
     cmd->args.blt.tint = tint;
 }
 
-void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy,
-                         float scale, EngineSprite *sprite, int tint) {
-    if (display_list == NULL || display_list->count >= kMaxCommands || sprite == NULL) return;
-    RenderCommand *cmd = &display_list->commands[display_list->count++];
+void dl_push_draw_sprite(DisplayList *dl, int16_t cx, int16_t cy, float scale, float angle,
+                         EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint) {
+    assert(dl != NULL);
+    assert(dl->count < kMaxCommands);
+    RenderCommand *cmd = &dl->commands[dl->count++];
     cmd->type = kCmdDrawSprite;
     cmd->args.draw_sprite.cx = cx;
     cmd->args.draw_sprite.cy = cy;
     cmd->args.draw_sprite.scale = scale;
-    cmd->args.draw_sprite.img = sprite->image;
-    cmd->args.draw_sprite.u = sprite->u;
-    cmd->args.draw_sprite.v = sprite->v;
-    cmd->args.draw_sprite.w = sprite->w;
-    cmd->args.draw_sprite.h = sprite->h;
-    cmd->args.draw_sprite.colkey = sprite->colkey;
+    cmd->args.draw_sprite.angle = angle;
+    cmd->args.draw_sprite.img = img;
+    cmd->args.draw_sprite.u = u;
+    cmd->args.draw_sprite.v = v;
+    cmd->args.draw_sprite.w = w;
+    cmd->args.draw_sprite.h = h;
+    cmd->args.draw_sprite.colkey = colkey;
     cmd->args.draw_sprite.tint = tint;
 }
 
@@ -99,7 +106,10 @@ void dl_push_draw_text(DisplayList *display_list, int16_t x, int16_t y, EngineIm
                        int char_w, int char_h, int columns,
                        const uint8_t *text, int text_len,
                        int16_t *lookup, int tint) {
-    if (display_list == NULL || display_list->count >= kMaxCommands || font == NULL || text == NULL) return;
+    assert(display_list != NULL);
+    assert(display_list->count < kMaxCommands);
+    assert(font != NULL);
+    assert(text != NULL);
     RenderCommand *cmd = &display_list->commands[display_list->count++];
     cmd->type = kCmdDrawText;
     cmd->args.draw_text.x = x;

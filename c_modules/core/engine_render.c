@@ -113,7 +113,7 @@ static void render_blt(EngineFramebuffer *framebuffer, int16_t x, int16_t y, Eng
 }
 
 static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx, int16_t cy,
-                               float scale, EngineImage *img,
+                               float scale, float angle, EngineImage *img,
                                int16_t u, int16_t v, int16_t w, int16_t h,
                                uint16_t colkey_in, int tint) {
     if (framebuffer->format != kFormatIndex8) {
@@ -131,15 +131,26 @@ static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx, int16
     uint8_t *dst = framebuffer->buffer;
     uint8_t *src = img->data;
 
+    float cos_a = cosf(angle);
+    float sin_a = sinf(angle);
+
     float inv_scale = 1.0f / scale;
-    int cos_inv_fp = (int)(inv_scale * 256.0f);
-    int sin_inv_fp = 0; // rotation not implemented yet
+    // For inverse mapping (screen to texture), we use -angle.
+    // cos(-a) = cos(a), sin(-a) = -sin(a)
+    float c_val = cos_a * inv_scale;
+    float s_val = -sin_a * inv_scale;
+    
+    int cos_inv_fp = (int)(c_val * 256.0f);
+    int sin_inv_fp = (int)(s_val * 256.0f);
 
     int cx_fp = cx << 8;
     int cy_fp = cy << 8;
 
-    int half_w = (int)((w * scale) / 2.0f);
-    int half_h = (int)((h * scale) / 2.0f);
+    // Exact bounding box of the rotated rectangle
+    float c_fwd = cos_a * scale;
+    float s_fwd = sin_a * scale;
+    int half_w = (int)(fabsf((w / 2.0f) * c_fwd) + fabsf((h / 2.0f) * s_fwd)) + 1;
+    int half_h = (int)(fabsf((w / 2.0f) * s_fwd) + fabsf((h / 2.0f) * c_fwd)) + 1;
 
     int min_x = cx - half_w;
     int max_x = cx + half_w;
@@ -157,27 +168,31 @@ static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx, int16
 
     for (int dy = min_y; dy < max_y; dy++) {
         int dist_y_fp = (dy << 8) - cy_fp;
-        int sx_base_fp = -((dist_y_fp * sin_inv_fp) >> 8) + w_half_fp;
-        int sy_base_fp = ((dist_y_fp * cos_inv_fp) >> 8) + h_half_fp;
-        int dst_idx_base = dy * dst_w;
-
-        int dist_x_fp_start = (min_x << 8) - cx_fp;
-        int sx_fp = ((dist_x_fp_start * cos_inv_fp) >> 8) + sx_base_fp;
-        int sy_fp = ((dist_x_fp_start * sin_inv_fp) >> 8) + sy_base_fp;
+        
+        // Base coordinates for the start of the scanline (min_x)
+        int dist_x_fp = (min_x << 8) - cx_fp;
+        int sx_fp = -((dist_y_fp * sin_inv_fp) >> 8) + w_half_fp + ((dist_x_fp * cos_inv_fp) >> 8);
+        int sy_fp =  ((dist_y_fp * cos_inv_fp) >> 8) + h_half_fp + ((dist_x_fp * sin_inv_fp) >> 8);
 
         for (int dx = min_x; dx < max_x; dx++) {
             int sx = sx_fp >> 8;
             int sy = sy_fp >> 8;
-            sx_fp += cos_inv_fp;
-            sy_fp += sin_inv_fp;
-
-            if ((unsigned int)sx < (unsigned int)w && (unsigned int)sy < (unsigned int)h) {
-                int src_idx = sy * src_w + uv_base + sx;
-                uint8_t src_val = src[src_idx];
-                if (src_val != colkey) {
-                    dst[dst_idx_base + dx] = (tint != -1) ? (uint8_t)tint : src_val;
+            
+            if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
+                uint8_t color = src[uv_base + sy * src_w + sx];
+                if (color != colkey) {
+                    if (tint >= 0) {
+                        dst[dy * dst_w + dx] = (uint8_t)tint;
+                    } else {
+                        dst[dy * dst_w + dx] = color;
+                    }
                 }
             }
+            
+            // Advance by 1 pixel in X (which corresponds to 1<<8 in FP)
+            // So sx_fp increases by cos_inv_fp, sy_fp increases by sin_inv_fp
+            sx_fp += cos_inv_fp;
+            sy_fp += sin_inv_fp;
         }
     }
 }
@@ -267,7 +282,7 @@ void render_display_list(EngineFramebuffer *framebuffer, DisplayList *display_li
                 break;
             case kCmdDrawSprite:
                 render_draw_sprite(framebuffer, cmd->args.draw_sprite.cx, cmd->args.draw_sprite.cy,
-                                   cmd->args.draw_sprite.scale, cmd->args.draw_sprite.img,
+                                   cmd->args.draw_sprite.scale, cmd->args.draw_sprite.angle, cmd->args.draw_sprite.img,
                                    cmd->args.draw_sprite.u, cmd->args.draw_sprite.v,
                                    cmd->args.draw_sprite.w, cmd->args.draw_sprite.h,
                                    cmd->args.draw_sprite.colkey, cmd->args.draw_sprite.tint);

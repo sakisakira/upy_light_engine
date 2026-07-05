@@ -1,10 +1,16 @@
 #include "py/runtime.h"
 #include "py/obj.h"
-#include "engine_types.h"
 #include "engine_render.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <driver/spi_master.h>
+#include <driver/gpio.h>
+#include <esp_heap_caps.h>
+#include <esp_timer.h>
+#include <string.h>
+
+#include "engine_types.h"
 
 // --- Image Type ---
 typedef struct _lightengine_Image_obj_t {
@@ -14,16 +20,22 @@ typedef struct _lightengine_Image_obj_t {
 
 
 static mp_obj_t image_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 3, 3, false);
+    mp_arg_check_num(n_args, n_kw, 3, 4, false);
     lightengine_Image_obj_t *self = m_new_obj(lightengine_Image_obj_t);
     self->base.type = type;
     self->img.width = mp_obj_get_int(args[0]);
     self->img.height = mp_obj_get_int(args[1]);
     self->img.format = mp_obj_get_int(args[2]);
     
-    size_t size = self->img.width * self->img.height;
-    if (self->img.format == kFormatArgb4444) size *= 2;
-    self->img.data = m_new(uint8_t, size);
+    if (n_args >= 4) {
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(args[3], &bufinfo, MP_BUFFER_RW);
+        self->img.data = bufinfo.buf;
+    } else {
+        size_t size = self->img.width * self->img.height;
+        if (self->img.format == kFormatArgb4444) size *= 2;
+        self->img.data = m_new(uint8_t, size);
+    }
     
     return MP_OBJ_FROM_PTR(self);
 }
@@ -103,16 +115,22 @@ typedef struct _lightengine_Framebuffer_obj_t {
 
 
 static mp_obj_t framebuffer_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    mp_arg_check_num(n_args, n_kw, 3, 3, false);
+    mp_arg_check_num(n_args, n_kw, 3, 4, false);
     lightengine_Framebuffer_obj_t *self = m_new_obj(lightengine_Framebuffer_obj_t);
     self->base.type = type;
     self->fb.width = mp_obj_get_int(args[0]);
     self->fb.height = mp_obj_get_int(args[1]);
     self->fb.format = mp_obj_get_int(args[2]);
     
-    size_t size = self->fb.width * self->fb.height;
-    if (self->fb.format == kFormatArgb4444) size *= 2;
-    self->fb.buffer = m_new(uint8_t, size);
+    if (n_args >= 4) {
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(args[3], &bufinfo, MP_BUFFER_RW);
+        self->fb.buffer = bufinfo.buf;
+    } else {
+        size_t size = self->fb.width * self->fb.height;
+        if (self->fb.format == kFormatArgb4444) size *= 2;
+        self->fb.buffer = m_new(uint8_t, size);
+    }
     
     return MP_OBJ_FROM_PTR(self);
 }
@@ -144,7 +162,14 @@ typedef struct _lightengine_DisplayList_obj_t {
 static mp_obj_t dl_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = m_new_obj(lightengine_DisplayList_obj_t);
     self->base.type = type;
-    self->dl = dl_create();
+    
+    // Allocate DisplayList from MicroPython heap (it's ~45KB, FreeRTOS malloc might fail!)
+    self->dl = m_new(DisplayList, 1);
+    if (self->dl == NULL) {
+        mp_raise_msg(&mp_type_MemoryError, MP_ROM_QSTR(MP_QSTR_Failed_to_allocate_DisplayList));
+    }
+    dl_init(self->dl);
+    
     return MP_OBJ_FROM_PTR(self);
 }
 
@@ -188,13 +213,19 @@ static mp_obj_t dl_meth_push_draw_sprite(size_t n_args, const mp_obj_t *args) {
     int cx = mp_obj_get_int(args[1]);
     int cy = mp_obj_get_int(args[2]);
     float scale = mp_obj_get_float(args[3]);
-    lightengine_Sprite_obj_t *sprite = MP_OBJ_TO_PTR(args[4]);
-    int tint = mp_obj_get_int(args[5]);
+    float angle = mp_obj_get_float(args[4]);
+    lightengine_Image_obj_t *img = MP_OBJ_TO_PTR(args[5]);
+    int u = mp_obj_get_int(args[6]);
+    int v = mp_obj_get_int(args[7]);
+    int w = mp_obj_get_int(args[8]);
+    int h = mp_obj_get_int(args[9]);
+    int colkey = mp_obj_get_int(args[10]);
+    int tint = mp_obj_get_int(args[11]);
     
-    dl_push_draw_sprite(self->dl, cx, cy, scale, &sprite->sprite, tint);
+    dl_push_draw_sprite(self->dl, cx, cy, scale, angle, &img->img, u, v, w, h, colkey, tint);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_sprite_obj, 6, 6, dl_meth_push_draw_sprite);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_sprite_obj, 12, 12, dl_meth_push_draw_sprite);
 
 static mp_obj_t dl_meth_push_blt(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -257,19 +288,160 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 // --- Module ---
 
+// --- SPI DMA Native Driver ---
+static spi_device_handle_t spi_disp_handle = NULL;
+static int pin_dc = -1;
+#define FULL_PIXELS (240 * 135)
+
+static mp_obj_t mod_init_display(size_t n_args, const mp_obj_t *args) {
+    int spi_host = mp_obj_get_int(args[0]); 
+    int baudrate = mp_obj_get_int(args[1]);
+    int mosi = mp_obj_get_int(args[2]);
+    int sck = mp_obj_get_int(args[3]);
+    int cs = mp_obj_get_int(args[4]);
+    int dc = mp_obj_get_int(args[5]);
+    
+    pin_dc = dc;
+
+// No DMA allocation here, done in send_display_internal
+
+    spi_bus_config_t buscfg = {
+        .miso_io_num = -1,
+        .mosi_io_num = mosi,
+        .sclk_io_num = sck,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = FULL_PIXELS * 2 + 8
+    };
+
+    spi_device_interface_config_t devcfg = {
+        .clock_speed_hz = baudrate,
+        .mode = 0,
+        .spics_io_num = cs,
+        .queue_size = 7,
+        .flags = SPI_DEVICE_NO_DUMMY,
+    };
+
+    spi_host_device_t host = (spi_host == 1) ? SPI2_HOST : SPI3_HOST;
+    
+    esp_err_t ret = spi_bus_initialize(host, &buscfg, SPI_DMA_CH_AUTO);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to initialize SPI bus: %d"), ret);
+    }
+
+    ret = spi_bus_add_device(host, &devcfg, &spi_disp_handle);
+    if (ret != ESP_OK) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to add SPI device: %d"), ret);
+    }
+
+    gpio_set_direction((gpio_num_t)dc, GPIO_MODE_OUTPUT);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_init_display_obj, 6, 6, mod_init_display);
+
+static mp_obj_t mod_spi_write_cmd(mp_obj_t cmd_in) {
+    uint8_t cmd = (uint8_t)mp_obj_get_int(cmd_in);
+    gpio_set_level((gpio_num_t)pin_dc, 0); 
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length = 8;
+    t.tx_buffer = &cmd;
+    spi_device_polling_transmit(spi_disp_handle, &t);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_spi_write_cmd_obj, mod_spi_write_cmd);
+
+static mp_obj_t mod_spi_write_data(mp_obj_t data_in) {
+    mp_buffer_info_t data_buf;
+    mp_get_buffer_raise(data_in, &data_buf, MP_BUFFER_READ);
+    
+    gpio_set_level((gpio_num_t)pin_dc, 1);
+    spi_transaction_t t;
+    memset(&t, 0, sizeof(t));
+    t.length = data_buf.len * 8;
+    t.tx_buffer = data_buf.buf;
+    spi_device_polling_transmit(spi_disp_handle, &t);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_spi_write_data_obj, mod_spi_write_data);
+
+
+// --- Render & DMA Task ---
 static TaskHandle_t render_task_handle = NULL;
 static QueueHandle_t render_queue = NULL;
+static volatile int pending_render_jobs = 0;
 
 typedef struct {
     lightengine_Framebuffer_obj_t *fb;
     lightengine_DisplayList_obj_t *dl;
+    uint16_t *palette;
 } RenderJob;
+
+enum {
+    kChunkHeight = 15,
+    kNumChunks = 135 / kChunkHeight,
+    kChunkPixels = 240 * kChunkHeight,
+    kChunkBytes = kChunkPixels * 2
+};
+
+static uint16_t *dma_chunk_bufs[2] = {NULL, NULL};
+static spi_transaction_t chunk_trans[2];
+
+static void send_display_internal(uint8_t *src, uint16_t *pal) {
+    if (spi_disp_handle == NULL) return;
+    gpio_set_level((gpio_num_t)pin_dc, 1);
+
+    if (dma_chunk_bufs[0] == NULL) {
+        dma_chunk_bufs[0] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
+        dma_chunk_bufs[1] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
+        if (dma_chunk_bufs[0] == NULL) return;
+    }
+
+    int buf_idx = 0;
+    int queued = 0;
+
+    for (int chunk = 0; chunk < kNumChunks; chunk++) {
+        if (queued == 2) {
+            spi_transaction_t *ret_trans;
+            spi_device_get_trans_result(spi_disp_handle, &ret_trans, portMAX_DELAY);
+            queued--;
+        }
+
+        uint16_t *dst = dma_chunk_bufs[buf_idx];
+        int src_offset = chunk * kChunkPixels;
+        
+        for (int p = 0; p < kChunkPixels; p++) {
+            dst[p] = pal[src[src_offset + p]];
+        }
+
+        memset(&chunk_trans[buf_idx], 0, sizeof(spi_transaction_t));
+        chunk_trans[buf_idx].length = kChunkBytes * 8;
+        chunk_trans[buf_idx].tx_buffer = dst;
+        
+        spi_device_queue_trans(spi_disp_handle, &chunk_trans[buf_idx], portMAX_DELAY);
+        queued++;
+        buf_idx = 1 - buf_idx;
+    }
+
+    while (queued > 0) {
+        spi_transaction_t *ret_trans;
+        spi_device_get_trans_result(spi_disp_handle, &ret_trans, portMAX_DELAY);
+        queued--;
+    }
+}
 
 static void render_task(void *arg) {
     RenderJob job;
+    
     while (1) {
         if (xQueueReceive(render_queue, &job, portMAX_DELAY) == pdTRUE) {
             render_display_list(&job.fb->fb, job.dl->dl);
+            
+            if (job.palette != NULL) {
+                send_display_internal(job.fb->fb.buffer, job.palette);
+            }
+
+            __atomic_fetch_sub(&pending_render_jobs, 1, __ATOMIC_SEQ_CST);
         }
     }
 }
@@ -277,23 +449,42 @@ static void render_task(void *arg) {
 static mp_obj_t mod_init(void) {
     if (render_task_handle == NULL) {
         render_queue = xQueueCreate(10, sizeof(RenderJob));
-        xTaskCreate(render_task, "render_task", 4096, NULL, 5, &render_task_handle);
+    extern BaseType_t xTaskCreatePinnedToCore(TaskFunction_t pxTaskCode, const char * const pcName, const uint32_t usStackDepth, void * const pvParameters, UBaseType_t uxPriority, TaskHandle_t * const pxCreatedTask, const BaseType_t xCoreID);
+        xTaskCreatePinnedToCore(render_task, "render_task", 4096, NULL, 5, &render_task_handle, 1);
     }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mod_init_obj, mod_init);
 
-static mp_obj_t mod_submit_display_list(mp_obj_t fb_in, mp_obj_t dl_in) {
-    if (render_queue == NULL) return mp_const_none;
-    
-    RenderJob job = {
-        .fb = MP_OBJ_TO_PTR(fb_in),
-        .dl = MP_OBJ_TO_PTR(dl_in)
-    };
-    xQueueSend(render_queue, &job, portMAX_DELAY);
+static mp_obj_t mod_submit_and_send(mp_obj_t fb_in, mp_obj_t dl_in, mp_obj_t pal_in) {
+    if (render_queue != NULL) {
+        __atomic_fetch_add(&pending_render_jobs, 1, __ATOMIC_SEQ_CST);
+        
+        uint16_t *pal_ptr = NULL;
+        if (pal_in != mp_const_none) {
+            mp_buffer_info_t pal_buf;
+            mp_get_buffer_raise(pal_in, &pal_buf, MP_BUFFER_READ);
+            pal_ptr = (uint16_t*)pal_buf.buf;
+        }
+
+        RenderJob job = {
+            .fb = MP_OBJ_TO_PTR(fb_in),
+            .dl = MP_OBJ_TO_PTR(dl_in),
+            .palette = pal_ptr
+        };
+        xQueueSend(render_queue, &job, portMAX_DELAY);
+    }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(mod_submit_display_list_obj, mod_submit_display_list);
+static MP_DEFINE_CONST_FUN_OBJ_3(mod_submit_and_send_obj, mod_submit_and_send);
+
+static mp_obj_t mod_sync(void) {
+    while (__atomic_load_n(&pending_render_jobs, __ATOMIC_SEQ_CST) > 0) {
+        vTaskDelay(1);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_sync_obj, mod_sync);
 
 static const mp_rom_map_elem_t lightengine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR__lightengine) },
@@ -302,8 +493,12 @@ static const mp_rom_map_elem_t lightengine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_Framebuffer), MP_ROM_PTR(&lightengine_Framebuffer_type) },
     { MP_ROM_QSTR(MP_QSTR_DisplayList), MP_ROM_PTR(&lightengine_DisplayList_type) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&mod_init_obj) },
-    { MP_ROM_QSTR(MP_QSTR_submit_display_list), MP_ROM_PTR(&mod_submit_display_list_obj) },
-};
+    { MP_ROM_QSTR(MP_QSTR_submit_and_send), MP_ROM_PTR(&mod_submit_and_send_obj) },
+    { MP_ROM_QSTR(MP_QSTR_sync), MP_ROM_PTR(&mod_sync_obj) },
+    { MP_ROM_QSTR(MP_QSTR_init_display), MP_ROM_PTR(&mod_init_display_obj) },
+    { MP_ROM_QSTR(MP_QSTR_spi_write_cmd), MP_ROM_PTR(&mod_spi_write_cmd_obj) },
+    { MP_ROM_QSTR(MP_QSTR_spi_write_data), MP_ROM_PTR(&mod_spi_write_data_obj) },
+    };
 static MP_DEFINE_CONST_DICT(lightengine_module_globals, lightengine_module_globals_table);
 
 const mp_obj_module_t lightengine_user_cmodule = {

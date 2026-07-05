@@ -75,6 +75,7 @@ typedef struct {
         struct {
             int16_t cx, cy;
             float scale;
+            float angle;
             EngineImage *img;
             int16_t u, v, w, h;
             uint16_t colkey;
@@ -92,7 +93,7 @@ typedef struct {
     } args;
 } RenderCommand;
 
-enum { kMaxCommands = 1024 };
+enum { kMaxCommands = 256 };
 
 typedef struct {
     RenderCommand commands[kMaxCommands];
@@ -113,7 +114,7 @@ void dl_push_pset(DisplayList *display_list, int16_t x, int16_t y, uint16_t colo
 void dl_push_line(DisplayList *display_list, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
 void dl_push_fill_rect(DisplayList *display_list, int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
 void dl_push_blt(DisplayList *display_list, int16_t x, int16_t y, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint);
-void dl_push_draw_sprite(DisplayList *display_list, int16_t cx, int16_t cy, float scale, EngineSprite *sprite, int tint);
+void dl_push_draw_sprite(DisplayList *dl, int16_t cx, int16_t cy, float scale, float angle, EngineImage *img, int16_t u, int16_t v, int16_t w, int16_t h, uint16_t colkey, int tint);
 void dl_push_draw_text(DisplayList *display_list, int16_t x, int16_t y, EngineImage *font,
                        int char_w, int char_h, int columns,
                        const uint8_t *text, int text_len,
