@@ -23,12 +23,21 @@ typedef struct {
     uint8_t wave_type;
     uint8_t volume;
     uint32_t phase;
+    uint32_t samples_played;
 } channel_t;
 
 static channel_t channels[MAX_CHANNELS];
 static i2s_chan_handle_t tx_chan = NULL;
 static TaskHandle_t sound_task_handle = NULL;
 static bool engine_running = false;
+
+// Random state for noise generation
+// Linear Congruential Generator (LCG) using constants from "Numerical Recipes in C"
+static uint32_t rng_state = 12345;
+static inline uint32_t next_random() {
+    rng_state = rng_state * 1664525 + 1013904223;
+    return rng_state;
+}
 
 static void es8311_write_reg(uint8_t reg, uint8_t val) {
     uint8_t data[2] = {reg, val};
@@ -40,11 +49,14 @@ static void sound_task(void *arg) {
     int16_t sample_buf[512]; // 256 stereo samples (1024 bytes)
     size_t bytes_written;
 
+    // Decay rate: how many samples it takes to reach 0 from max volume (e.g., 0.5 seconds = 22050 samples)
+    uint32_t decay_samples = sample_rate / 2;
+
     while (engine_running) {
         // Check if all channels are silent
         bool all_silent = true;
         for (int c = 0; c < MAX_CHANNELS; c++) {
-            if (channels[c].freq > 0 && channels[c].volume > 0) {
+            if (channels[c].freq > 0 && channels[c].volume > 0 && channels[c].samples_played < decay_samples) {
                 all_silent = false;
                 break;
             }
@@ -61,15 +73,37 @@ static void sound_task(void *arg) {
         for (int i = 0; i < 256; i++) {
             int32_t mixed_val = 0;
             for (int c = 0; c < MAX_CHANNELS; c++) {
-                if (channels[c].freq > 0 && channels[c].volume > 0) {
+                if (channels[c].freq > 0 && channels[c].volume > 0 && channels[c].samples_played < decay_samples) {
                     uint32_t period = sample_rate / channels[c].freq;
                     if (period == 0) continue;
-                    uint32_t half_period = period / 2;
                     
-                    // wave_type 0 = Square wave
-                    int16_t val = ((channels[c].phase % period) < half_period) ? (channels[c].volume * 30) : -(channels[c].volume * 30);
+                    // Linear decay calculation
+                    float decay_factor = 1.0f - ((float)channels[c].samples_played / (float)decay_samples);
+                    int32_t current_vol = (int32_t)(channels[c].volume * decay_factor * 30);
+                    
+                    uint32_t pos = channels[c].phase % period;
+                    int16_t val = 0;
+                    
+                    if (channels[c].wave_type == 0) { // Square
+                        uint32_t half_period = period / 2;
+                        val = (pos < half_period) ? current_vol : -current_vol;
+                    } else if (channels[c].wave_type == 1) { // Sawtooth
+                        val = (int16_t)(((pos * current_vol * 2) / period) - current_vol);
+                    } else if (channels[c].wave_type == 2) { // Triangle
+                        uint32_t half_period = period / 2;
+                        if (pos < half_period) {
+                            val = (int16_t)(((pos * current_vol * 2) / half_period) - current_vol);
+                        } else {
+                            val = (int16_t)(current_vol - (((pos - half_period) * current_vol * 2) / half_period));
+                        }
+                    } else if (channels[c].wave_type == 3) { // Noise
+                        // Update noise value less frequently (e.g. every 16 samples) for lower pitch noise, or every sample
+                        val = (int16_t)((next_random() % (current_vol * 2)) - current_vol);
+                    }
+
                     mixed_val += val;
                     channels[c].phase++;
+                    channels[c].samples_played++;
                 }
             }
             // Clip
@@ -179,9 +213,10 @@ static mp_obj_t sound_engine_set_channel(size_t n_args, const mp_obj_t *args) {
     channels[ch].wave_type = mp_obj_get_int(args[2]);
     channels[ch].volume = mp_obj_get_int(args[3]);
     
-    // Reset phase when a new frequency starts
-    if (channels[ch].freq == 0) {
+    // Reset phase and decay when a new frequency starts (or whenever set_channel is called with freq > 0)
+    if (channels[ch].freq > 0) {
         channels[ch].phase = 0;
+        channels[ch].samples_played = 0;
     }
 
     return mp_const_none;

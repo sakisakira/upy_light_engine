@@ -2,8 +2,11 @@ from engine import framebuffer as fb
 from engine.image import Image
 from engine import sound
 import math
-import machine
-machine.freq(240000000)
+try:
+    import machine
+    machine.freq(240000000)
+except ImportError:
+    pass
 
 try:
     import engine.font as font_lib
@@ -119,10 +122,14 @@ score_font_half = None
 # Fonts are now loaded at the top
 frames = 0
 is_start_pressed = False
+is_a_pressed = False
+is_b_pressed = False
+is_x_pressed = False
+is_y_pressed = False
 
 def update():
     global x, y, dx, dy, frames
-    global is_start_pressed
+    global is_start_pressed, is_a_pressed, is_b_pressed, is_x_pressed, is_y_pressed
     from engine import input as inp
     from engine.time import clock
     
@@ -134,6 +141,26 @@ def update():
             clock.pause()
     is_start_pressed = current_start
     
+    current_a = inp.button(inp.Button_A)
+    if current_a and not is_a_pressed:
+        sound.play_sfx("shoot")
+    is_a_pressed = current_a
+
+    current_b = inp.button(inp.Button_B)
+    if current_b and not is_b_pressed:
+        sound.play_sfx("jump")
+    is_b_pressed = current_b
+
+    current_x = inp.button(inp.Button_X)
+    if current_x and not is_x_pressed:
+        sound.play_sfx("coin")
+    is_x_pressed = current_x
+
+    current_y = inp.button(inp.Button_Y)
+    if current_y and not is_y_pressed:
+        sound.play_sfx("hit")
+    is_y_pressed = current_y
+    
     if clock.is_paused:
         return
         
@@ -141,6 +168,11 @@ def update():
     frames += 1
     
     if frames == 120:
+        # Chord progression (Do -> Do-Mi -> Do-Mi-So -> Do-Mi-So-Do)
+        mml = "T100 O4 V100 C2 C4 C4 C4, T100 O4 V100 R2 E4 E4 E4, T100 O4 V100 R2 R4 G4 G4, T100 O4 V100 R2 R4 R4 >C4"
+        sound.play_mml(mml)
+        
+    if frames == 360:
         sound.play_mml("V32 T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
     
     if inp.button(inp.Button_Left):

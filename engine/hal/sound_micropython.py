@@ -20,6 +20,10 @@ class SoundHAL:
         self.stop_request = False
         self.silence_buf = bytearray(1024)
         
+        self.tracks = [None] * 4
+        self.track_indices = [0] * 4
+        self.track_end_times = [0] * 4
+        
         # Keep old variables for M5 compatibility
         self.current_note_end_time = 0
         self.current_freq = 0
@@ -94,27 +98,49 @@ class SoundHAL:
             print("SoundHAL: All sound initializations failed.")
 
     def play_tone(self, freq, duration_ms):
-        self.play_sequence([(freq, duration_ms)])
+        self.play_sequence([[(freq, duration_ms, 64)]])
         
-    def play_sequence(self, notes):
+    def play_sfx(self, notes, channel=3):
+        if not self.is_ready: return
+        if self.mode == "bare_i2s": return # Not supported
+        
+        if len(notes) > 0 and isinstance(notes[0], tuple):
+            self.tracks[channel] = notes
+            self.track_indices[channel] = 0
+            self.track_end_times[channel] = time.ticks_ms()
+            self._start_note_for_track(channel)
+            
+    def play_sequence(self, tracks):
         if not self.is_ready: return
         self.stop()
         
-        # Wait for previous thread to finish if necessary
         if self.mode == "bare_i2s":
             while self.audio_thread_running:
                 time.sleep_ms(10)
                 
-        self.current_sequence = notes
-        self.current_note_index = 0
+        # If it's a flat list of tuples (single track), wrap it
+        if len(tracks) > 0 and isinstance(tracks[0], tuple):
+            tracks = [tracks]
+            
+        self.tracks = [None] * 4
+        self.track_indices = [0] * 4
+        self.track_end_times = [0] * 4
         
         if self.mode == "bare_i2s":
+            self.current_sequence = tracks[0] if len(tracks) > 0 else []
+            self.current_note_index = 0
             self.stop_request = False
             self.audio_thread_running = True
             _thread.start_new_thread(self._audio_thread, ())
         else:
-            self._start_current_note()
-            
+            now = time.ticks_ms()
+            for ch in range(4):
+                if ch < len(tracks):
+                    self.tracks[ch] = tracks[ch]
+                    self.track_indices[ch] = 0
+                    self.track_end_times[ch] = now
+                    self._start_note_for_track(ch)
+
     def _audio_thread(self):
         amplitude = 8000
         while not self.stop_request and self.current_note_index < len(self.current_sequence):
@@ -155,47 +181,45 @@ class SoundHAL:
         if self.i2s:
             self.i2s.write(self.silence_buf)
             
-    def _start_current_note(self):
-        # Used for c_module and m5_speaker
-        if self.current_note_index >= len(self.current_sequence):
-            self.current_freq = 0
-            if self.mode == "c_module":
-                self.c_engine.stop_all()
+    def _start_note_for_track(self, ch):
+        if not self.tracks[ch]:
             return
             
-        note = self.current_sequence[self.current_note_index]
-        self.current_freq = note[0]
+        idx = self.track_indices[ch]
+        if idx >= len(self.tracks[ch]):
+            if self.mode == "c_module":
+                self.c_engine.set_channel(ch, 0, 0, 0)
+            self.tracks[ch] = None
+            return
+            
+        note = self.tracks[ch][idx]
+        freq = note[0]
         duration = note[1]
         volume = note[2] if len(note) > 2 else 64
+        wave_type = note[3] if len(note) > 3 else 0
         
-        self.current_note_end_time = time.ticks_add(time.ticks_ms(), duration)
+        self.track_end_times[ch] = time.ticks_add(time.ticks_ms(), duration)
         
         if self.mode == "c_module":
-            if self.current_freq == 0:
-                self.c_engine.set_channel(0, 0, 0, 0)
-            else:
-                self.c_engine.set_channel(0, self.current_freq, 0, volume)
-        elif self.mode == "m5_speaker" and self.speaker:
-            if self.current_freq > 0:
-                self.speaker.tone(self.current_freq, duration)
+            self.c_engine.set_channel(ch, freq, wave_type, volume)
+        elif self.mode == "m5_speaker" and self.speaker and ch == 0:
+            if freq > 0:
+                self.speaker.tone(freq, duration)
             
     def update(self):
-        # In bare_i2s mode, the background thread handles everything
-        if self.mode == "bare_i2s":
-            return
-            
-        if not self.is_ready or not self.current_sequence: return
+        if self.mode == "bare_i2s": return
+        if not self.is_ready: return
         
         now = time.ticks_ms()
-        # if current time is past the end time, move to next note
-        if time.ticks_diff(self.current_note_end_time, now) <= 0:
-            self.current_note_index += 1
-            self._start_current_note()
+        for ch in range(4):
+            if self.tracks[ch]:
+                if time.ticks_diff(self.track_end_times[ch], now) <= 0:
+                    self.track_indices[ch] += 1
+                    self._start_note_for_track(ch)
 
     def stop(self):
         self.stop_request = True
-        self.current_sequence = []
-        self.current_freq = 0
+        self.tracks = [None] * 4
         if self.mode == "c_module":
             self.c_engine.stop_all()
         elif self.mode == "bare_i2s" and self.i2s:

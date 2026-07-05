@@ -19,6 +19,10 @@ class SoundHAL:
     def play_sequence(self, notes):
         if not notes:
             return
+            
+        # Handle multi-track MML (just play track 0 on PC)
+        if isinstance(notes[0], list):
+            notes = notes[0]
 
         self.current_sequence = notes
         self.total_duration = sum(note[1] for note in notes) / 1000.0

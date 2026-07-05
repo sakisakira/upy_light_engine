@@ -16,22 +16,13 @@ BASE_FREQS = {
     'b': 493.88
 }
 
-def parse_mml(mml):
-    """
-    Parses an MML string and returns a list of (frequency_hz, duration_ms) tuples.
-    Commands:
-      Txxx: Tempo (BPM)
-      Ox: Octave (0-8)
-      Lxx: Default length
-      CDEFGAB[#+-][x][.]: Note, optional sharp/flat, optional length, optional dot
-      R[x][.]: Rest
-    """
+def _parse_single_track(mml, initial_tempo, initial_volume):
     mml = mml.lower()
     i = 0
-    tempo = 120
+    tempo = initial_tempo
     octave = 4
     default_length = 4
-    volume = 64
+    volume = initial_volume
     
     notes = []
     
@@ -102,4 +93,28 @@ def parse_mml(mml):
                 
             notes.append((0, int(duration_ms), 0))
             
-    return notes
+    return notes, tempo, volume
+
+def parse_mml(mml):
+    """
+    Parses an MML string and returns a list of tracks (each track is a list of note tuples).
+    Tracks are separated by commas.
+    Commands:
+      Txxx: Tempo (BPM)
+      Ox: Octave (0-8)
+      Lxx: Default length
+      Vxxx: Volume (0-100)
+      CDEFGAB[#+-][x][.]: Note, optional sharp/flat, optional length, optional dot
+      R[x][.]: Rest
+      < >: Octave down/up
+    """
+    tracks = []
+    tempo = 120
+    volume = 64
+    
+    parts = mml.split(',')
+    for part in parts:
+        notes, tempo, volume = _parse_single_track(part, tempo, volume)
+        tracks.append(notes)
+        
+    return tracks

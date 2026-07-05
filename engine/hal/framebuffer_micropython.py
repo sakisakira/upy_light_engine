@@ -142,8 +142,8 @@ def run(update, draw, fps=30):
             _lightengine.submit_and_send(screen._c_fbs[screen.buf_idx], screen.dl, colors565)
             profiler.end("submit")
             
-            # Print free memory every 60 frames to monitor leaks
-            if engine_time.clock.frame_count % 60 == 0:
+            # Print free memory every 600 frames to monitor leaks
+            if engine_time.clock.frame_count % 600 == 0:
                 print(f"FPS: {engine_time.clock.fps} | Free Mem: {gc.mem_free()} bytes")
             
             profiler.start("sleep")

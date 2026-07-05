@@ -22,6 +22,10 @@ class SoundHAL:
         if not notes:
             return
 
+        # Handle multi-track MML (just play track 0 on PC)
+        if isinstance(notes[0], list):
+            notes = notes[0]
+
         self.stop()
         
         self.current_sequence = notes
