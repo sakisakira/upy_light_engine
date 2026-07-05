@@ -122,14 +122,18 @@ static mp_obj_t framebuffer_make_new(const mp_obj_type_t *type, size_t n_args, s
     self->fb.height = mp_obj_get_int(args[1]);
     self->fb.format = mp_obj_get_int(args[2]);
     
-    if (n_args >= 4) {
+    if (n_args >= 4 && args[3] != mp_const_none) {
         mp_buffer_info_t bufinfo;
         mp_get_buffer_raise(args[3], &bufinfo, MP_BUFFER_RW);
         self->fb.buffer = bufinfo.buf;
     } else {
         size_t size = self->fb.width * self->fb.height;
-        if (self->fb.format == kFormatArgb4444) size *= 2;
-        self->fb.buffer = m_new(uint8_t, size);
+        if (self->fb.format == kFormatArgb4444 || self->fb.format == kFormatRgb565) size *= 2;
+        self->fb.buffer = heap_caps_malloc(size, MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+        if (self->fb.buffer == NULL) {
+            mp_raise_msg(&mp_type_MemoryError, MP_ROM_QSTR(MP_QSTR_Failed_to_allocate_framebuffer_on_C_heap));
+        }
+        memset(self->fb.buffer, 0, size);
     }
     
     return MP_OBJ_FROM_PTR(self);
@@ -163,12 +167,11 @@ static mp_obj_t dl_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_k
     lightengine_DisplayList_obj_t *self = m_new_obj(lightengine_DisplayList_obj_t);
     self->base.type = type;
     
-    // Allocate DisplayList from MicroPython heap (it's ~45KB, FreeRTOS malloc might fail!)
-    self->dl = m_new(DisplayList, 1);
+    // Allocate DisplayList from C standard heap (malloc) to save MicroPython GC heap
+    self->dl = dl_create();
     if (self->dl == NULL) {
         mp_raise_msg(&mp_type_MemoryError, MP_ROM_QSTR(MP_QSTR_Failed_to_allocate_DisplayList));
     }
-    dl_init(self->dl);
     
     return MP_OBJ_FROM_PTR(self);
 }
@@ -291,6 +294,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 // --- SPI DMA Native Driver ---
 static spi_device_handle_t spi_disp_handle = NULL;
 static int pin_dc = -1;
+static volatile int pending_render_jobs; // Forward declaration
 #define FULL_PIXELS (240 * 135)
 
 static mp_obj_t mod_init_display(size_t n_args, const mp_obj_t *args) {
@@ -300,6 +304,12 @@ static mp_obj_t mod_init_display(size_t n_args, const mp_obj_t *args) {
     int sck = mp_obj_get_int(args[3]);
     int cs = mp_obj_get_int(args[4]);
     int dc = mp_obj_get_int(args[5]);
+
+    // Wait for any pending renders from the PREVIOUS run to finish before touching SPI!
+    // This prevents Kernel Panics if the user soft-reboots while Core 1 is actively sending DMA chunks.
+    while (__atomic_load_n(&pending_render_jobs, __ATOMIC_SEQ_CST) > 0) {
+        taskYIELD();
+    }
     
     pin_dc = dc;
 
@@ -402,6 +412,16 @@ static void send_display_internal(uint8_t *src, uint16_t *pal) {
         if (dma_chunk_bufs[0] == NULL) return;
     }
 
+    // Memory write (0x2C)
+    uint8_t cmd = 0x2C;
+    spi_transaction_t t;
+    gpio_set_level((gpio_num_t)pin_dc, 0);
+    memset(&t, 0, sizeof(t));
+    t.length = 8;
+    t.tx_buffer = &cmd;
+    spi_device_polling_transmit(spi_disp_handle, &t);
+    gpio_set_level((gpio_num_t)pin_dc, 1); // Back to data mode for DMA chunks
+
     int buf_idx = 0;
     int queued = 0;
 
@@ -485,7 +505,7 @@ static MP_DEFINE_CONST_FUN_OBJ_3(mod_submit_and_send_obj, mod_submit_and_send);
 
 static mp_obj_t mod_sync(void) {
     while (__atomic_load_n(&pending_render_jobs, __ATOMIC_SEQ_CST) > 0) {
-        vTaskDelay(1);
+        taskYIELD(); // Yield without sleeping to reduce sync latency
     }
     return mp_const_none;
 }

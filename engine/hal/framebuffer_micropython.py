@@ -17,17 +17,19 @@ class Framebuffer:
         self.width = width
         self.height = height
         self.format = "INDEX8"
-        if buffer is None:
-            self.buffers = [bytearray(width * height), bytearray(width * height)]
-        else:
-            self.buffers = [buffer, bytearray(width * height)]
         self.buf_idx = 0
             
         import _lightengine
-        self._c_fbs = [
-            _lightengine.Framebuffer(self.width, self.height, 2, self.buffers[0]),
-            _lightengine.Framebuffer(self.width, self.height, 2, self.buffers[1])
-        ]
+        if buffer is None:
+            self._c_fbs = [
+                _lightengine.Framebuffer(self.width, self.height, 2, None),
+                _lightengine.Framebuffer(self.width, self.height, 2, None)
+            ]
+        else:
+            self._c_fbs = [
+                _lightengine.Framebuffer(self.width, self.height, 2, buffer),
+                _lightengine.Framebuffer(self.width, self.height, 2, None)
+            ]
         
         self.dls = [_lightengine.DisplayList(), _lightengine.DisplayList()]
         self.dl_idx = 0
@@ -149,7 +151,10 @@ def run(update, draw, fps=30):
             dt = time.ticks_diff(t1, t0)
             sleep_ms = target_ms - dt
             if sleep_ms > 0:
-                # Busy-wait to avoid ESP32 RTOS tick rounding (which can sleep up to 10ms extra)
+                # Sleep to yield CPU to FreeRTOS IDLE task (prevents Watchdog Timeout crash)
+                if sleep_ms > 2:
+                    time.sleep_ms(sleep_ms - 2)
+                # Busy-wait the remaining time to avoid ESP32 RTOS tick rounding
                 while time.ticks_diff(time.ticks_ms(), t0) < target_ms:
                     pass
             profiler.end("sleep")
