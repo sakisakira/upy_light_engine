@@ -77,7 +77,7 @@ class Framebuffer:
         self.dl.push_blt(int(x), int(y), img._c_image, int(u), int(v), int(w), int(h), colkey, -1 if tint is None else tint)
 
     def text(self, font, text, x, y, color=1, scale=1.0):
-        text_bytes = text.encode('ascii', 'ignore')
+        text_bytes = text if type(text) is bytes or type(text) is bytearray else text.encode('ascii', 'ignore')
         self.dl.push_draw_text(int(x), int(y), font.image._c_image, font.char_w, font.char_h, font.cols, text_bytes, -1 if color is None else color)
 
 # ---- Window and Game Loop Management ----

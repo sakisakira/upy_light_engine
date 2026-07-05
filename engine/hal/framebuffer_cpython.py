@@ -71,7 +71,7 @@ class Framebuffer:
 
     def text(self, font, text, x, y, color=1, scale=1.0):
         if hasattr(font, 'image') and hasattr(font, '_c_lookup'):
-            text_bytes = text.encode('utf-8')
+            text_bytes = text if type(text) is bytes or type(text) is bytearray else text.encode('utf-8')
             c_text = ctypes.create_string_buffer(text_bytes)
             self._c_refs.append(c_text)
             

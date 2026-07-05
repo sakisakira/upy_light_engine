@@ -1,6 +1,29 @@
 from engine import framebuffer as fb
 from engine.image import Image
 from engine import sound
+import math
+
+try:
+    import engine.font as font_lib
+    score_font_6px = font_lib.Font("assets/fonts/test_6px_font.afnt")
+    score_font_16px = font_lib.Font("assets/fonts/test_16px_font.afnt")
+except Exception as e:
+    import gc
+    from engine import logger
+    logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
+    score_font_6px = None
+    score_font_16px = None
+
+# --- Lookup Tables for Performance (Float Reduction) ---
+# To avoid allocating float objects and calling math.sin during the game loop
+# (which is very slow on MicroPython), we precompute animation tables.
+# Using tuple() ensures we pre-allocate float objects so they don't allocate during the loop.
+BREATH_SCALE_TABLE = tuple(1.0 + 0.2 * math.sin(i * 0.1) for i in range(63)) # 63 frames full cycle
+GRAD_SCALE_TABLE = tuple(1.5 + 0.5 * math.sin(i * 0.05) for i in range(126))
+ROT_TABLE = tuple(i * 0.05 for i in range(126))
+TRI_SCALE_TABLE = tuple(1.2 + 0.3 * math.sin(i * 0.03) for i in range(210))
+
+# Remove particle system demonstration as it slowed down the main loop
 
 # Generate a test INDEX8 sprite (circle: top red, bottom blue)
 def create_test_image(width, height):
@@ -91,8 +114,7 @@ sprite_gradient = None
 sprite_triangle = None
 score_font = None
 score_font_half = None
-score_font_6px = None
-score_font_16px = None
+# Fonts are now loaded at the top
 frames = 0
 is_start_pressed = False
 
@@ -153,38 +175,38 @@ def draw():
 
     # Draw multiple rectangles to easily check if alpha blending works
     for i in range(5):
-        bx, by, bw, bh = 50 + i*30, 40 + i*10, 40, 40
-        bcol = COL_RED # Opaque Red
-        fb.screen.rect(bx, by, bw, bh, bcol)
+        bx = 50 + i * 30
+        by = 40 + i * 10
+        fb.screen.rect(bx, by, 40, 40, COL_RED) # Opaque Red
+        
     profiler.end("draw_rects")
 
     profiler.start("draw_sprites")
     # Blend the sprite
-    import math
     if sprite:
         # Convert left-top (x, y) to center (cx, cy)
-        cx = x + sprite.w / 2
-        cy = y + sprite.h / 2
+        cx = x + sprite.w // 2
+        cy = y + sprite.h // 2
         
-        # Breathing animation: scale oscillates between 0.8 and 1.2
-        breath_scale = 1.0 + 0.2 * math.sin(frames * 0.1)
+        # Breathing animation using LUT
+        breath_scale = BREATH_SCALE_TABLE[frames % len(BREATH_SCALE_TABLE)]
         fb.screen.sprite(cx, cy, sprite, scale=breath_scale)
         
     if sprite_gradient:
-        cx_grad = (x - 40) + sprite_gradient.w / 2
-        cy_grad = y + sprite_gradient.h / 2
+        cx_grad = (x - 40) + sprite_gradient.w // 2
+        cy_grad = y + sprite_gradient.h // 2
         
-        # Breathing animation: scale oscillates between 1.0 and 2.0
-        grad_scale = 1.5 + 0.5 * math.sin(frames * 0.05)
+        # Breathing animation using LUT
+        grad_scale = GRAD_SCALE_TABLE[frames % len(GRAD_SCALE_TABLE)]
         fb.screen.sprite(cx_grad, cy_grad, sprite_gradient, scale=grad_scale)
         
     if sprite_triangle:
-        cx_tri = (x + 40) + sprite_triangle.w / 2
-        cy_tri = (y + 40) + sprite_triangle.h / 2
-        # Continuous rotation
-        rot = frames * 0.05
-        # Scale oscillates slightly
-        tri_scale = 1.2 + 0.3 * math.sin(frames * 0.03)
+        cx_tri = (x + 40) + sprite_triangle.w // 2
+        cy_tri = (y + 40) + sprite_triangle.h // 2
+        # Continuous rotation using LUT
+        rot = ROT_TABLE[frames % len(ROT_TABLE)]
+        # Scale oscillates slightly using LUT
+        tri_scale = TRI_SCALE_TABLE[frames % len(TRI_SCALE_TABLE)]
         fb.screen.sprite(cx_tri, cy_tri, sprite_triangle, rotate=rot, scale=tri_scale)
 
     # Test pset
@@ -197,14 +219,14 @@ def draw():
 
     profiler.start("draw_text")
     # Test text drawing
-    import engine.hal.font as font_lib
+    import engine.font as font_lib
     if score_font:
-        font_lib.text(fb.screen, 80, 10, "SCORE 1234 (100%)", score_font, COL_YELLOW)
+        font_lib.text(fb.screen, 80, 10, b"SCORE 1234 (100%)", score_font, COL_YELLOW)
     if score_font_half:
-        font_lib.text(fb.screen, 80, 50, "SCORE 1234 (50%)", score_font_half, COL_YELLOW)
+        font_lib.text(fb.screen, 80, 50, b"SCORE 1234 (50%)", score_font_half, COL_YELLOW)
     if score_font_6px:
         # Measure text first
-        text_str = "SCORE 1234 (6PX PIXEL FONT)"
+        text_str = b"SCORE 1234 (6PX PIXEL FONT)"
         w, h = font_lib.measure_text(text_str, score_font_6px)
         
         # Draw a dark gray background rectangle exactly matching the text bounds
@@ -212,7 +234,7 @@ def draw():
         font_lib.text_shadowed(fb.screen, 80, 80, text_str, score_font_6px, color=COL_YELLOW, shadow_color=COL_BLACK)
         
     if score_font_16px:
-        text_str_16 = "HELLO 16PX FONT!"
+        text_str_16 = b"HELLO 16PX FONT!"
         w16, h16 = font_lib.measure_text(text_str_16, score_font_16px)
         fb.screen.rect(10, 100, w16, h16, COL_GRAY)
         font_lib.text(fb.screen, 10, 100, text_str_16, score_font_16px, COL_WHITE)
@@ -260,23 +282,7 @@ if __name__ == "__main__":
     img_triangle = create_triangle_image(32, 32)
     sprite_triangle = img_triangle.subimage(0, 0, img_triangle.width, img_triangle.height)
     
-    logger.debug("test 1: Before import engine.hal.font")
-
-    import engine.hal.font as font_lib
-    logger.debug("test 2: After import engine.hal.font")
-    
-    try:
-        # MicroPython on Cardputer has limited heap. score_font.afnt is ~180KB!
-        # We only load the 6px font (~6KB) to avoid Out Of Memory errors.
-        # score_font = font_lib.Font("assets/fonts/score_font.afnt")
-        # score_font_half = font_lib.Font("assets/fonts/score_font_half.afnt")
-        logger.debug("test 3: Loading fonts...")
-        score_font_6px = font_lib.Font("assets/fonts/test_6px_font.afnt")
-        score_font_16px = font_lib.Font("assets/fonts/test_16px_font.afnt")
-        logger.debug("test 4: Fonts loaded.")
-    except Exception as e:
-        import gc
-        logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
+    logger.debug("test 1: Engine init complete")
         
     logger.debug("test 5: Before fb.run")
     

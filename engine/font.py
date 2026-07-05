@@ -65,7 +65,7 @@ def measure_text(string, font, spacing=0):
     if not string:
         return 0, 0
         
-    lines = string.split('\n')
+    lines = string.split(b'\n' if type(string) is bytes or type(string) is bytearray else '\n')
     h = len(lines) * font.char_h
     
     max_chars = 0
@@ -93,12 +93,12 @@ def text(fb, x, y, string, font, color=None, spacing=0):
     cx = x
     cy = y
     for char in string:
-        if char == '\n':
+        code = char if type(char) is int else ord(char)
+        if char == '\n' or code == 10:
             cx = x
             cy += font.char_h
             continue
             
-        code = ord(char)
         index = -1
         if font.char_map is not None:
             if code in font.char_map:
