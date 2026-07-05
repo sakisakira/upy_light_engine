@@ -1,4 +1,4 @@
-# Walkthrough 36: Phase 4 WASM 移植とCPythonアーキテクチャの統合
+# Walkthrough 30 Phase 4: WASM 移植とCPythonアーキテクチャの統合
 
 このドキュメントでは、`upy_light_engine` の WASM/Pyodide への移植（Phase 4）の成功、および CPython（Windows/Mac）と Web（WASM）の HAL（ハードウェア抽象化レイヤー）を統一する上で必要だった重要なクロスプラットフォーム対応・バグ修正についてまとめます。
 
