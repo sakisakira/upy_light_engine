@@ -105,7 +105,6 @@ typedef struct {
 // Initialize a display list
 DisplayList* dl_create(void);
 void dl_destroy(DisplayList *display_list);
-
 void dl_init(DisplayList *display_list);
 void dl_clear(DisplayList *display_list);
 

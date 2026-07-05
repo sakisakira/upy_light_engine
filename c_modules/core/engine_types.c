@@ -12,6 +12,8 @@ void dl_destroy(DisplayList *display_list) {
     if (display_list) free(display_list);
 }
 
+#include <stdio.h>
+
 void dl_init(DisplayList *display_list) {
     if (display_list != NULL) {
         display_list->count = 0;

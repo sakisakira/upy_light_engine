@@ -19,17 +19,15 @@ class Image:
         if sys.platform == 'esp32':
             import _lightengine
             self._c_image = _lightengine.Image(self.width, self.height, 2, self.data)
-        elif sys.platform == 'emscripten':
-            pass
         else:
-            from .hal.engine_cpython import CEngineImage
+            from .hal.engine_ctypes import CEngineImage
             import ctypes
             self._c_image = CEngineImage()
             self._c_image.width = self.width
             self._c_image.height = self.height
             self._c_image.format = 2 # kFormatIndex8
             self._c_data = (ctypes.c_uint8 * len(self.data)).from_buffer(self.data)
-            self._c_image.data = ctypes.cast(self._c_data, ctypes.POINTER(ctypes.c_uint8))
+            self._c_image.data = ctypes.addressof(self._c_data)
 
     _cache = {}
 

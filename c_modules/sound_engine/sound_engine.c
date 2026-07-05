@@ -31,12 +31,14 @@ static i2s_chan_handle_t tx_chan = NULL;
 static TaskHandle_t sound_task_handle = NULL;
 static bool engine_running = false;
 
-// Random state for noise generation
-// Linear Congruential Generator (LCG) using constants from "Numerical Recipes in C"
-static uint32_t rng_state = 12345;
-static inline uint32_t next_random() {
-    rng_state = rng_state * 1664525 + 1013904223;
-    return rng_state;
+// Pseudo-random number generator using a Linear Congruential Generator (LCG).
+// The constants multiplier (1664525) and increment (1013904223) are the standard 
+// values recommended in "Numerical Recipes in C" (Press et al., 1992).
+// This is used for generating fast, deterministic noise without relying on external libraries.
+static uint32_t _random_seed = 12345;
+static uint32_t _next_random() {
+    _random_seed = _random_seed * 1664525 + 1013904223;
+    return _random_seed;
 }
 
 static void es8311_write_reg(uint8_t reg, uint8_t val) {
@@ -98,7 +100,7 @@ static void sound_task(void *arg) {
                         }
                     } else if (channels[c].wave_type == 3) { // Noise
                         // Update noise value less frequently (e.g. every 16 samples) for lower pitch noise, or every sample
-                        val = (int16_t)((next_random() % (current_vol * 2)) - current_vol);
+                        val = (int16_t)((_next_random() % (current_vol * 2)) - current_vol);
                     }
 
                     mixed_val += val;

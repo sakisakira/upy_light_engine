@@ -44,7 +44,7 @@ class Font:
             
         self.image = Image(img_w, img_h, pixel_data)
         
-        if sys.platform not in ('esp32', 'emscripten'):
+        if sys.platform != 'esp32':
             import ctypes
             self._c_lookup = (ctypes.c_int16 * 256)()
             for i in range(256):

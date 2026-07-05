@@ -18,6 +18,27 @@ class SoundHAL:
         else:
             self.temp_wav = "/tmp/upy_light_engine_beep.wav"
 
+    def _play_wav_os(self, path):
+        if sys.platform == 'win32':
+            import winsound
+            winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        elif sys.platform == 'darwin':
+            import subprocess
+            self.process = subprocess.Popen(["afplay", path])
+        elif sys.platform.startswith('linux'):
+            import subprocess
+            self.process = subprocess.Popen(["aplay", "-q", path])
+
+    def _stop_wav_os(self):
+        if sys.platform == 'win32':
+            import winsound
+            winsound.PlaySound(None, winsound.SND_PURGE)
+        else:
+            if self.process:
+                self.process.kill()
+                self.process.wait()
+                self.process = None
+
     def play_tone(self, freq, duration_ms):
         self.play_sequence([(freq, duration_ms, 127)])
 
@@ -44,35 +65,30 @@ class SoundHAL:
         from engine.hal import sound_synth
         wav_content = sound_synth.render_wav(notes)
         
+        # Windows locks the file while playing asynchronously.
+        # To avoid PermissionError, we generate a unique filename each time.
+        if sys.platform == 'win32':
+            import tempfile
+            self.temp_wav = os.path.join(tempfile.gettempdir(), f"upy_light_engine_beep_{int(time.time()*1000)}.wav")
+            
         # Save to temp file
         with open(self.temp_wav, "wb") as f:
             f.write(wav_content)
             
         # OS-specific playback
-        if sys.platform == 'win32':
-            import winsound
-            winsound.PlaySound(self.temp_wav, winsound.SND_FILENAME | winsound.SND_ASYNC)
-        elif sys.platform == 'darwin':
-            import subprocess
-            self.process = subprocess.Popen(["afplay", self.temp_wav])
+        self._play_wav_os(self.temp_wav)
             
         self.is_playing = True
         self.play_start_time = time.time()
 
     def stop(self):
         if self.is_playing:
-            if sys.platform == 'win32':
-                import winsound
-                winsound.PlaySound(None, winsound.SND_PURGE)
-            elif sys.platform == 'darwin':
-                if self.process:
-                    self.process.kill()
-                    self.process.wait()
+            self._stop_wav_os()
             self.is_playing = False
 
     def update(self):
         if self.is_playing:
-            if sys.platform == 'darwin':
+            if sys.platform != 'win32':
                 if self.process and self.process.poll() is not None:
                     self.is_playing = False
                     self.current_sequence = []

@@ -43,9 +43,16 @@ class SoundHAL:
         osc.frequency.setValueAtTime(freq, t)
         
         gain = self.audio_ctx.createGain()
-        # envelope: tiny fade out to prevent clicks
         gain.gain.setValueAtTime(0.1, t)
-        gain.gain.setTargetAtTime(0, t + (duration_ms / 1000.0) - 0.01, 0.01)
+        
+        # PC-style decay: linear fade to 0 over 0.5 seconds
+        dur_sec = duration_ms / 1000.0
+        decay_time = 0.5
+        actual_decay = min(decay_time, dur_sec)
+        gain.gain.linearRampToValueAtTime(0.1 * (1.0 - actual_decay/decay_time), t + actual_decay)
+        
+        # Quick fade out at the end to prevent pop noise
+        gain.gain.setTargetAtTime(0, t + dur_sec - 0.01, 0.005)
         
         osc.connect(gain)
         gain.connect(self.audio_ctx.destination)
@@ -60,26 +67,41 @@ class SoundHAL:
         if self.audio_ctx.state == "suspended":
             self.audio_ctx.resume()
             
-        t = self.audio_ctx.currentTime
-        for freq, duration_ms in notes:
-            dur_sec = duration_ms / 1000.0
-            if freq > 0:
-                osc = self.audio_ctx.createOscillator()
-                osc.type = "square"
-                osc.frequency.setValueAtTime(freq, t)
-                
-                gain = self.audio_ctx.createGain()
-                gain.gain.setValueAtTime(0.1, t)
-                # Quick fade out at the end of the note to prevent pop noise
-                gain.gain.setTargetAtTime(0, t + dur_sec - 0.01, 0.005)
-                
-                osc.connect(gain)
-                gain.connect(self.audio_ctx.destination)
-                
-                osc.start(t)
-                osc.stop(t + dur_sec)
+        if isinstance(notes[0], tuple):
+            notes = [notes]
             
-            t += dur_sec
+        for track in notes:
+            t = self.audio_ctx.currentTime
+            for note in track:
+                freq = note[0]
+                duration_ms = note[1]
+                vol = note[2] / 255.0 if len(note) > 2 else 0.1
+                wave_type = note[3] if len(note) > 3 else 0
+                
+                dur_sec = duration_ms / 1000.0
+                if freq > 0:
+                    osc = self.audio_ctx.createOscillator()
+                    osc.type = ["square", "sawtooth", "triangle", "square"][wave_type] # Noise not easily supported, fallback to square
+                    osc.frequency.setValueAtTime(freq, t)
+                    
+                    gain = self.audio_ctx.createGain()
+                    gain.gain.setValueAtTime(vol, t)
+                    
+                    # PC-style decay: linear fade to 0 over 0.5 seconds
+                    decay_time = 0.5
+                    actual_decay = min(decay_time, dur_sec)
+                    gain.gain.linearRampToValueAtTime(vol * (1.0 - actual_decay/decay_time), t + actual_decay)
+                    
+                    # Quick fade out at the end to prevent pop noise if it didn't fully decay
+                    gain.gain.setTargetAtTime(0, t + dur_sec - 0.01, 0.005)
+                    
+                    osc.connect(gain)
+                    gain.connect(self.audio_ctx.destination)
+                    
+                    osc.start(t)
+                    osc.stop(t + dur_sec)
+                
+                t += dur_sec
 
     def stop(self):
         if self.audio_ctx:

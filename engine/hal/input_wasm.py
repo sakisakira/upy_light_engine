@@ -15,8 +15,8 @@ _js_to_key = {
     "KeyD": Button_Right,
     "KeyN": Button_A,
     "KeyM": Button_B,
-    "KeyH": Button_X,
-    "KeyJ": Button_Y,
+    "Comma": Button_X,
+    "Period": Button_Y,
     "Space": Button_Select,
     "Enter": Button_Start,
     

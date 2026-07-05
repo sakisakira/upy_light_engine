@@ -15,7 +15,8 @@ try:
 except Exception as e:
     import gc
     from engine import logger
-    logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
+    mem = getattr(gc, 'mem_free', lambda: 0)()
+    logger.error(f"Could not load font: {e} (Free memory: {mem} bytes)")
     score_font_6px = None
     score_font_16px = None
 
@@ -190,13 +191,19 @@ def update():
     if y <= 0: y = 0
     if y >= 135 - 32: y = 135 - 32
 
+class DummyProfiler:
+    def start(self, name): pass
+    def end(self, name): pass
+    def report(self): pass
+
+try:
+    from engine.profiler import profiler
+    profiler.enabled = False
+except ImportError:
+    profiler = DummyProfiler()
+
 def draw():
     from engine import input as inp
-    try:
-        from engine.profiler import profiler
-        profiler.enabled = False
-    except ImportError:
-        pass
     
     profiler.start("draw_rects")
     # Fill background depending on button press
@@ -315,10 +322,6 @@ if __name__ == "__main__":
     
     img_triangle = create_triangle_image(32, 32)
     sprite_triangle = img_triangle.subimage(0, 0, img_triangle.width, img_triangle.height)
-    
-    logger.debug("test 1: Engine init complete")
-        
-    logger.debug("test 5: Before fb.run")
     
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)
