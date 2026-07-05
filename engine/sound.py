@@ -6,17 +6,8 @@ if sys.platform == 'esp32':
     from engine.hal.sound_micropython import SoundHAL
 elif sys.platform == 'emscripten':
     from engine.hal.sound_wasm import SoundHAL
-elif sys.platform == 'win32':
-    try:
-        from engine.hal.sound_cpython_win import SoundHAL
-    except ImportError:
-        class SoundHAL:
-            def play_tone(self, freq, duration_ms): pass
-            def play_sequence(self, notes): pass
-            def stop(self): pass
-            def update(self): pass
-elif sys.platform == 'darwin':
-    from engine.hal.sound_cpython_mac import SoundHAL
+elif sys.platform == 'win32' or sys.platform == 'darwin':
+    from engine.hal.sound_cpython import SoundHAL
 else:
     # Fallback to dummy
     class SoundHAL:
