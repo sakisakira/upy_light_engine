@@ -129,20 +129,3 @@ class ST7789:
         self.write_data(bytearray([y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF]))
         
         self.write_cmd(0x2C) # Memory Write
-
-    def show(self, buffer):
-        # Now handled by framebuffer_micropython.py directly calling _lightengine.send_display
-        pass
-        
-    @micropython.viper
-    def _send_lines_viper(self, idx_buf, chunk_buf, pal_buf, total_pixels: int, start_idx: int):
-        src = ptr8(idx_buf)
-        dst = ptr8(chunk_buf)
-        pal = ptr8(pal_buf)
-        
-        for i in range(total_pixels):
-            c = src[start_idx + i]
-            pal_idx = c << 1
-            dst_idx = i << 1
-            dst[dst_idx] = pal[pal_idx]
-            dst[dst_idx + 1] = pal[pal_idx + 1]

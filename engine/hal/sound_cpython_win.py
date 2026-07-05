@@ -14,18 +14,22 @@ class SoundHAL:
         self.total_duration = 0
 
     def play_tone(self, freq, duration_ms):
-        self.play_sequence([(freq, duration_ms)])
+        self.play_sequence([(freq, duration_ms, 127)])
 
     def play_sequence(self, notes):
         if not notes:
             return
 
         self.current_sequence = notes
-        self.total_duration = sum(duration for freq, duration in notes) / 1000.0
+        self.total_duration = sum(note[1] for note in notes) / 1000.0
         
         # Generate the entire sequence as a single WAV in memory
         audio_data = bytearray()
-        for freq, duration_ms in notes:
+        for note in notes:
+            freq = note[0]
+            duration_ms = note[1]
+            volume = note[2] if len(note) > 2 else 127
+            
             num_samples = int(self.sample_rate * (duration_ms / 1000.0))
             if freq == 0:
                 # Rest
