@@ -13,7 +13,13 @@ class Sprite:
         self.tint = tint
         
         import sys
-        if sys.platform not in ('esp32', 'emscripten'):
+        if sys.platform == 'esp32':
+            import _lightengine
+            if hasattr(self.image, '_c_image'):
+                self._c_sprite = _lightengine.Sprite(self.image._c_image, self.u, self.v, self.w, self.h, self.colkey)
+        elif sys.platform == 'emscripten':
+            pass
+        else:
             from .hal.engine_cpython import CEngineSprite
             import ctypes
             self._c_sprite = CEngineSprite()

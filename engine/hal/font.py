@@ -86,7 +86,7 @@ def text(fb, x, y, string, font, color=None, spacing=0):
     spacing: extra pixels (can be negative) to add between characters.
     """
     # Delegate to optimized C module if available
-    if hasattr(fb, '_fast_text') and spacing == 0:
+    if hasattr(fb, 'text') and spacing == 0:
         fb.text(font, string, x, y, color=color, scale=1.0)
         return
 

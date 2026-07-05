@@ -13,10 +13,15 @@ class Image:
             self.data = bytearray(width * height)
         else:
             self.data = buffer
-        self._mv = memoryview(self.data).cast('B')
+        self._mv = memoryview(self.data)
         
         import sys
-        if sys.platform not in ('esp32', 'emscripten'):
+        if sys.platform == 'esp32':
+            import _lightengine
+            self._c_image = _lightengine.Image(self.width, self.height, 2, self.data)
+        elif sys.platform == 'emscripten':
+            pass
+        else:
             from .hal.engine_cpython import CEngineImage
             import ctypes
             self._c_image = CEngineImage()

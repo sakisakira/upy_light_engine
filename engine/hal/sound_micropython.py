@@ -17,6 +17,7 @@ class SoundHAL:
         self.current_sequence = []
         self.current_note_index = 0
         self.audio_thread_running = False
+        self.stop_request = False
         self.silence_buf = bytearray(1024)
         
         # Keep old variables for M5 compatibility
@@ -100,14 +101,15 @@ class SoundHAL:
         self.stop()
         
         # Wait for previous thread to finish if necessary
-        if self.mode in ("bare_i2s", "c_module"):
+        if self.mode == "bare_i2s":
             while self.audio_thread_running:
                 time.sleep_ms(10)
                 
         self.current_sequence = notes
         self.current_note_index = 0
         
-        if self.mode in ("bare_i2s", "c_module"):
+        if self.mode == "bare_i2s":
+            self.stop_request = False
             self.audio_thread_running = True
             _thread.start_new_thread(self._audio_thread, ())
         else:
@@ -115,83 +117,83 @@ class SoundHAL:
             
     def _audio_thread(self):
         amplitude = 8000
-        while self.audio_thread_running and self.current_note_index < len(self.current_sequence):
+        while not self.stop_request and self.current_note_index < len(self.current_sequence):
             note = self.current_sequence[self.current_note_index]
             freq = note[0]
             duration_ms = note[1]
             
-            if self.mode == "c_module":
-                if freq == 0:
-                    self.c_engine.set_channel(0, 0, 0, 0)
-                else:
-                    self.c_engine.set_channel(0, freq, 0, 255) # ch=0, wave=0, vol=255
-                # Python Sequencer: just sleep for the duration!
-                time.sleep_ms(duration_ms)
+            # bare_i2s logic
+            if freq == 0:
+                buf = self.silence_buf
+                samples_per_buf = len(buf) // 4
+                total_samples = int(self.sample_rate * (duration_ms / 1000.0))
+                num_writes = total_samples // samples_per_buf
+                if num_writes == 0: num_writes = 1
             else:
-                # bare_i2s logic
-                if freq == 0:
-                    buf = self.silence_buf
-                    samples_per_buf = len(buf) // 4
-                    total_samples = int(self.sample_rate * (duration_ms / 1000.0))
-                    num_writes = total_samples // samples_per_buf
-                    if num_writes == 0: num_writes = 1
-                else:
-                    period = self.sample_rate // freq
-                    half_period = period // 2
-                    buf = bytearray(period * 4)
-                    for i in range(period):
-                        val = amplitude if i < half_period else -amplitude
-                        buf[i*4] = val & 0xFF
-                        buf[i*4+1] = (val >> 8) & 0xFF
-                        buf[i*4+2] = val & 0xFF
-                        buf[i*4+3] = (val >> 8) & 0xFF
-                        
-                    total_samples = int(self.sample_rate * (duration_ms / 1000.0))
-                    num_writes = total_samples // period
-                    if num_writes == 0: num_writes = 1
+                period = self.sample_rate // freq
+                half_period = period // 2
+                buf = bytearray(period * 4)
+                for i in range(period):
+                    val = amplitude if i < half_period else -amplitude
+                    buf[i*4] = val & 0xFF
+                    buf[i*4+1] = (val >> 8) & 0xFF
+                    buf[i*4+2] = val & 0xFF
+                    buf[i*4+3] = (val >> 8) & 0xFF
                     
-                for _ in range(num_writes):
-                    if not self.audio_thread_running:
-                        break
-                    self.i2s.write(buf)
+                total_samples = int(self.sample_rate * (duration_ms / 1000.0))
+                num_writes = total_samples // period
+                if num_writes == 0: num_writes = 1
                 
+            for _ in range(num_writes):
+                if self.stop_request:
+                    break
+                self.i2s.write(buf)
+            
             self.current_note_index += 1
             
         self.audio_thread_running = False
-        if self.mode == "c_module":
-            self.c_engine.stop_all()
-        elif self.i2s:
+        if self.i2s:
             self.i2s.write(self.silence_buf)
             
     def _start_current_note(self):
-        # Used only for m5_speaker
+        # Used for c_module and m5_speaker
         if self.current_note_index >= len(self.current_sequence):
             self.current_freq = 0
+            if self.mode == "c_module":
+                self.c_engine.stop_all()
             return
             
         note = self.current_sequence[self.current_note_index]
         self.current_freq = note[0]
         duration = note[1]
+        volume = note[2] if len(note) > 2 else 64
         
         self.current_note_end_time = time.ticks_add(time.ticks_ms(), duration)
         
-        if self.mode == "m5_speaker" and self.speaker:
-            self.speaker.tone(self.current_freq, duration)
+        if self.mode == "c_module":
+            if self.current_freq == 0:
+                self.c_engine.set_channel(0, 0, 0, 0)
+            else:
+                self.c_engine.set_channel(0, self.current_freq, 0, volume)
+        elif self.mode == "m5_speaker" and self.speaker:
+            if self.current_freq > 0:
+                self.speaker.tone(self.current_freq, duration)
             
     def update(self):
-        # In bare_i2s/c_module mode, the background thread handles everything!
-        if self.mode in ("bare_i2s", "c_module"):
+        # In bare_i2s mode, the background thread handles everything
+        if self.mode == "bare_i2s":
             return
             
         if not self.is_ready or not self.current_sequence: return
         
         now = time.ticks_ms()
-        if self.current_freq > 0 and time.ticks_diff(self.current_note_end_time, now) <= 0:
+        # if current time is past the end time, move to next note
+        if time.ticks_diff(self.current_note_end_time, now) <= 0:
             self.current_note_index += 1
             self._start_current_note()
 
     def stop(self):
-        self.audio_thread_running = False
+        self.stop_request = True
         self.current_sequence = []
         self.current_freq = 0
         if self.mode == "c_module":

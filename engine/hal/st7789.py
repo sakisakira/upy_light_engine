@@ -13,29 +13,24 @@ class ST7789:
         self.width = width
         self.height = height
         
-        # Hardware SPI initialization
-        self.spi = machine.SPI(
-            spi_id,
-            baudrate=baudrate,
-            sck=machine.Pin(sck),
-            mosi=machine.Pin(mosi)
-        )
-        # Pin initialization
-        self.cs = machine.Pin(cs, machine.Pin.OUT)
-        self.dc = machine.Pin(dc, machine.Pin.OUT)
+        # Hardware SPI initialization via C engine (DMA optimized)
+        try:
+            import _lightengine
+            _lightengine.init_display(spi_id, baudrate, mosi, sck, cs, dc)
+            self._le = _lightengine
+        except ImportError:
+            self._le = None
+            print("WARNING: _lightengine not found, ST7789 will not work!")
+        
+        # Pin initialization (for RST and BL)
         self.rst = machine.Pin(rst, machine.Pin.OUT)
         self.bl = machine.Pin(bl, machine.Pin.OUT)
         
         # Set initial states
-        self.cs(1)
         self.bl(1) # Turn on backlight
         
         self.reset()
         self.init_display()
-        
-        # Pre-allocate chunk buffer to prevent MemoryError and reduce SPI overhead
-        self.chunk_lines = 27
-        self.chunk_buf = bytearray(self.width * self.chunk_lines * 2)
         
     def reset(self):
         """Hardware reset of the display"""
@@ -46,17 +41,13 @@ class ST7789:
         
     def write_cmd(self, cmd):
         """Write a command byte"""
-        self.cs(0)
-        self.dc(0)
-        self.spi.write(bytearray([cmd]))
-        self.cs(1)
+        if self._le:
+            self._le.spi_write_cmd(cmd)
         
     def write_data(self, data):
         """Write data bytes"""
-        self.cs(0)
-        self.dc(1)
-        self.spi.write(data)
-        self.cs(1)
+        if self._le:
+            self._le.spi_write_data(data)
         
     def init_display(self):
         """Initialize the ST7789 registers"""
@@ -140,35 +131,8 @@ class ST7789:
         self.write_cmd(0x2C) # Memory Write
 
     def show(self, buffer):
-        """Fast transfer of the INDEX8 framebuffer to the display using colors565 palette"""
-        from ..palette import colors565
-        
-        try:
-            import graphics_engine
-        except ImportError:
-            graphics_engine = None
-        
-        self.set_window(0, 0, self.width - 1, self.height - 1)
-        
-        self.cs(0)
-        self.dc(1)
-        
-        # Use pre-allocated chunk buffer
-        chunk_buf = self.chunk_buf
-        w = self.width
-        chunk_lines = self.chunk_lines
-        pixels_per_chunk = w * chunk_lines
-        
-        start_idx = 0
-        for _ in range(self.height // chunk_lines):
-            if graphics_engine:
-                graphics_engine.convert_palette_chunk(buffer, start_idx, chunk_buf, colors565, pixels_per_chunk)
-            else:
-                self._send_lines_viper(buffer, chunk_buf, colors565, pixels_per_chunk, start_idx)
-            self.spi.write(chunk_buf)
-            start_idx += pixels_per_chunk
-            
-        self.cs(1)
+        # Now handled by framebuffer_micropython.py directly calling _lightengine.send_display
+        pass
         
     @micropython.viper
     def _send_lines_viper(self, idx_buf, chunk_buf, pal_buf, total_pixels: int, start_idx: int):

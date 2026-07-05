@@ -116,6 +116,9 @@ def update():
     sound.update()
     frames += 1
     
+    if frames == 120:
+        sound.play_mml("V32 T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
+    
     if inp.button(inp.Button_Left):
         x -= 2
     if inp.button(inp.Button_Right):
@@ -135,7 +138,7 @@ def draw():
     from engine import input as inp
     try:
         from engine.profiler import profiler
-        profiler.enabled = False # Disable by default to save print overhead
+        profiler.enabled = False
     except ImportError:
         pass
     
@@ -276,9 +279,6 @@ if __name__ == "__main__":
         logger.error(f"Could not load font: {e} (Free memory: {gc.mem_free()} bytes)")
         
     logger.debug("test 5: Before fb.run")
-    
-    # Play background music!
-    sound.play_mml("T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
     
     # Start the game loop at 60 FPS
     fb.run(update, draw, fps=60)

@@ -31,6 +31,7 @@ def parse_mml(mml):
     tempo = 120
     octave = 4
     default_length = 4
+    volume = 64
     
     notes = []
     
@@ -56,6 +57,8 @@ def parse_mml(mml):
             octave = get_num(octave)
         elif c == 'l':
             default_length = get_num(default_length)
+        elif c == 'v':
+            volume = get_num(volume)
         elif c == '<':
             octave = max(0, octave - 1)
         elif c == '>':
@@ -83,7 +86,7 @@ def parse_mml(mml):
             if dotted:
                 duration_ms *= 1.5
                 
-            notes.append((int(freq), int(duration_ms)))
+            notes.append((int(freq), int(duration_ms), volume))
             
         elif c == 'r':
             length = get_num(default_length)
@@ -97,6 +100,6 @@ def parse_mml(mml):
             if dotted:
                 duration_ms *= 1.5
                 
-            notes.append((0, int(duration_ms)))
+            notes.append((0, int(duration_ms), 0))
             
     return notes
