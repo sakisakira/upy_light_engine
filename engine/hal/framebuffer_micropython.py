@@ -136,18 +136,23 @@ def run(update, draw, fps=30):
             
             # Submit newly built display list for Core 1 to start rendering into CURRENT buffer AND sending it via SPI
             from engine.palette import colors565
-            display.set_window(0, 0, 239, 134)
+            profiler.start("submit")
             _lightengine.submit_and_send(screen._c_fbs[screen.buf_idx], screen.dl, colors565)
+            profiler.end("submit")
             
             # Print free memory every 60 frames to monitor leaks
             if engine_time.clock.frame_count % 60 == 0:
                 print(f"FPS: {engine_time.clock.fps} | Free Mem: {gc.mem_free()} bytes")
             
+            profiler.start("sleep")
             t1 = time.ticks_ms()
             dt = time.ticks_diff(t1, t0)
             sleep_ms = target_ms - dt
             if sleep_ms > 0:
-                time.sleep_ms(sleep_ms)
+                # Busy-wait to avoid ESP32 RTOS tick rounding (which can sleep up to 10ms extra)
+                while time.ticks_diff(time.ticks_ms(), t0) < target_ms:
+                    pass
+            profiler.end("sleep")
     except Exception as e:
         with open('error.log', 'w') as f:
             sys.print_exception(e, f)

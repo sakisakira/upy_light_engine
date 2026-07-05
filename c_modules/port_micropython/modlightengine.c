@@ -329,6 +329,11 @@ static mp_obj_t mod_init_display(size_t n_args, const mp_obj_t *args) {
         mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to initialize SPI bus: %d"), ret);
     }
 
+    if (spi_disp_handle != NULL) {
+        spi_bus_remove_device(spi_disp_handle);
+        spi_disp_handle = NULL;
+    }
+
     ret = spi_bus_add_device(host, &devcfg, &spi_disp_handle);
     if (ret != ESP_OK) {
         mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to add SPI device: %d"), ret);

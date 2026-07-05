@@ -39,6 +39,8 @@ class ST7789:
         self.rst(1)
         time.sleep_ms(50)
         
+        self._buf4 = bytearray(4)
+        
     def write_cmd(self, cmd):
         """Write a command byte"""
         if self._le:
@@ -122,10 +124,20 @@ class ST7789:
         y0 += 53
         y1 += 53
         
-        self.write_cmd(0x2A) # Column Address Set
-        self.write_data(bytearray([x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF]))
+        self.write_cmd(0x2A)
+        self._buf4[0] = x0 >> 8
+        self._buf4[1] = x0 & 0xFF
+        self._buf4[2] = x1 >> 8
+        self._buf4[3] = x1 & 0xFF
+        self.write_data(self._buf4)
         
-        self.write_cmd(0x2B) # Row Address Set
-        self.write_data(bytearray([y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF]))
+        # Row address set
+        self.write_cmd(0x2B)
+        self._buf4[0] = y0 >> 8
+        self._buf4[1] = y0 & 0xFF
+        self._buf4[2] = y1 >> 8
+        self._buf4[3] = y1 & 0xFF
+        self.write_data(self._buf4)
         
-        self.write_cmd(0x2C) # Memory Write
+        # Memory Write
+        self.write_cmd(0x2C)

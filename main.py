@@ -2,6 +2,8 @@ from engine import framebuffer as fb
 from engine.image import Image
 from engine import sound
 import math
+import machine
+machine.freq(240000000)
 
 try:
     import engine.font as font_lib
