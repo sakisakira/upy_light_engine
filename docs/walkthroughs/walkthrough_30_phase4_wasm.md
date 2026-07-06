@@ -43,3 +43,6 @@ WASM版のサウンドバックエンド（`sound_wasm.py`）は、C言語のソ
 - `core_engine.dll` は Windows x64 上で正常にビルド・実行されます。
 - `core_engine.so` はローカルのWebサーバー（Pyodide）上で正常にビルド・実行されます。
 - サウンド、フォント、コントローラーの操作感は、両プラットフォームで完全に同一に動作します。
+
+## 関連計画
+* サウンドのC言語化およびAudioWorkletを用いた同期・統一については、[Plan 36: WASM版のサウンドエンジン統一 (AudioWorklet化)](file:///d:/sakira/work/cardputer/upy_light_engine/docs/plans/plan_36_wasm_audio_worklet.md) にて後続開発として実施します。

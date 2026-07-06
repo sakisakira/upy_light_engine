@@ -34,3 +34,6 @@ Emscripten (`emcc`) を用いて、`c_modules/core` 以下のCソース群から
 ### [MODIFY] `scripts/web/index.html`
 - `<py-config>` の `files` リストに `engine_ctypes.py` とビルド済みの `core_engine.so` 等を追加。
 - 起動時に `core_engine.so` を自動でフェッチして仮想ファイルシステム上に配置する設定を追記。
+
+## 関連計画
+* [Plan 36: WASM版のサウンドエンジン統一 (AudioWorklet化)](file:///d:/sakira/work/cardputer/upy_light_engine/docs/plans/plan_36_wasm_audio_worklet.md) は、このPhase 4のサウンド機能拡張にあたります。

@@ -8,6 +8,8 @@
 #include "freertos/task.h"
 #include <string.h>
 
+#include "core/sound_synth.h"
+
 #define I2S_BCLK_PIN 41
 #define I2S_WS_PIN   43
 #define I2S_DOUT_PIN 42
@@ -16,30 +18,9 @@
 #define ES8311_ADDR  0x18
 #define I2C_PORT     I2C_NUM_1
 
-#define MAX_CHANNELS 4
-
-typedef struct {
-    uint16_t freq;
-    uint8_t wave_type;
-    uint8_t volume;
-    uint32_t phase;
-    uint32_t samples_played;
-} channel_t;
-
-static channel_t channels[MAX_CHANNELS];
 static i2s_chan_handle_t tx_chan = NULL;
 static TaskHandle_t sound_task_handle = NULL;
 static bool engine_running = false;
-
-// Pseudo-random number generator using a Linear Congruential Generator (LCG).
-// The constants multiplier (1664525) and increment (1013904223) are the standard 
-// values recommended in "Numerical Recipes in C" (Press et al., 1992).
-// This is used for generating fast, deterministic noise without relying on external libraries.
-static uint32_t _random_seed = 12345;
-static uint32_t _next_random() {
-    _random_seed = _random_seed * 1664525 + 1013904223;
-    return _random_seed;
-}
 
 static void es8311_write_reg(uint8_t reg, uint8_t val) {
     uint8_t data[2] = {reg, val};
@@ -47,74 +28,11 @@ static void es8311_write_reg(uint8_t reg, uint8_t val) {
 }
 
 static void sound_task(void *arg) {
-    int sample_rate = 44100;
     int16_t sample_buf[512]; // 256 stereo samples (1024 bytes)
     size_t bytes_written;
 
-    // Decay rate: how many samples it takes to reach 0 from max volume (e.g., 0.5 seconds = 22050 samples)
-    uint32_t decay_samples = sample_rate / 2;
-
     while (engine_running) {
-        // Check if all channels are silent
-        bool all_silent = true;
-        for (int c = 0; c < MAX_CHANNELS; c++) {
-            if (channels[c].freq > 0 && channels[c].volume > 0 && channels[c].samples_played < decay_samples) {
-                all_silent = false;
-                break;
-            }
-        }
-
-        if (all_silent) {
-            // Write silence to prevent under-run noise, but block slightly to avoid spinning
-            memset(sample_buf, 0, sizeof(sample_buf));
-            i2s_channel_write(tx_chan, sample_buf, sizeof(sample_buf), &bytes_written, portMAX_DELAY);
-            continue;
-        }
-
-        // Mix all channels
-        for (int i = 0; i < 256; i++) {
-            int32_t mixed_val = 0;
-            for (int c = 0; c < MAX_CHANNELS; c++) {
-                if (channels[c].freq > 0 && channels[c].volume > 0 && channels[c].samples_played < decay_samples) {
-                    uint32_t period = sample_rate / channels[c].freq;
-                    if (period == 0) continue;
-                    
-                    // Linear decay calculation
-                    float decay_factor = 1.0f - ((float)channels[c].samples_played / (float)decay_samples);
-                    int32_t current_vol = (int32_t)(channels[c].volume * decay_factor * 30);
-                    
-                    uint32_t pos = channels[c].phase % period;
-                    int16_t val = 0;
-                    
-                    if (channels[c].wave_type == 0) { // Square
-                        uint32_t half_period = period / 2;
-                        val = (pos < half_period) ? current_vol : -current_vol;
-                    } else if (channels[c].wave_type == 1) { // Sawtooth
-                        val = (int16_t)(((pos * current_vol * 2) / period) - current_vol);
-                    } else if (channels[c].wave_type == 2) { // Triangle
-                        uint32_t half_period = period / 2;
-                        if (pos < half_period) {
-                            val = (int16_t)(((pos * current_vol * 2) / half_period) - current_vol);
-                        } else {
-                            val = (int16_t)(current_vol - (((pos - half_period) * current_vol * 2) / half_period));
-                        }
-                    } else if (channels[c].wave_type == 3) { // Noise
-                        // Update noise value less frequently (e.g. every 16 samples) for lower pitch noise, or every sample
-                        val = (int16_t)((_next_random() % (current_vol * 2)) - current_vol);
-                    }
-
-                    mixed_val += val;
-                    channels[c].phase++;
-                    channels[c].samples_played++;
-                }
-            }
-            // Clip
-            if (mixed_val > 32767) mixed_val = 32767;
-            if (mixed_val < -32768) mixed_val = -32768;
-            
-            sample_buf[i * 2] = (int16_t)mixed_val;     // L
-            sample_buf[i * 2 + 1] = (int16_t)mixed_val; // R
-        }
+        sound_synth_render_int16(sample_buf, 256);
         
         esp_err_t err = i2s_channel_write(tx_chan, sample_buf, sizeof(sample_buf), &bytes_written, portMAX_DELAY);
         if (err != ESP_OK) {
@@ -133,7 +51,7 @@ static mp_obj_t sound_engine_init(void) {
         return mp_const_none; // Already running
     }
 
-    memset(channels, 0, sizeof(channels));
+    sound_synth_init(44100);
 
     // Initialize I2S
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_MASTER);
@@ -209,27 +127,18 @@ static mp_obj_t sound_engine_set_channel(size_t n_args, const mp_obj_t *args) {
     if (!engine_running) return mp_const_none;
 
     int ch = mp_obj_get_int(args[0]);
-    if (ch < 0 || ch >= MAX_CHANNELS) return mp_const_none;
-
-    channels[ch].freq = mp_obj_get_int(args[1]);
-    channels[ch].wave_type = mp_obj_get_int(args[2]);
-    channels[ch].volume = mp_obj_get_int(args[3]);
+    uint16_t freq = mp_obj_get_int(args[1]);
+    uint8_t wave_type = mp_obj_get_int(args[2]);
+    uint8_t volume = mp_obj_get_int(args[3]);
     
-    // Reset phase and decay when a new frequency starts (or whenever set_channel is called with freq > 0)
-    if (channels[ch].freq > 0) {
-        channels[ch].phase = 0;
-        channels[ch].samples_played = 0;
-    }
+    sound_synth_set_channel(ch, freq, wave_type, volume);
 
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(sound_engine_set_channel_obj, 4, 4, sound_engine_set_channel);
 
 static mp_obj_t sound_engine_stop_all(void) {
-    for (int i = 0; i < MAX_CHANNELS; i++) {
-        channels[i].freq = 0;
-        channels[i].volume = 0;
-    }
+    sound_synth_stop_all();
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sound_engine_stop_all_obj, sound_engine_stop_all);

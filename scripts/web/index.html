@@ -46,6 +46,40 @@
         Controls: W/A/S/D (D-Pad), N (A), M (B), , (X), . (Y), Space (Select), Enter (Start)
     </div>
 
+    <!-- AudioWorklet Initialization -->
+    <script>
+        window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        window.soundWorkletNode = null;
+
+        window.initAudioWorklet = async function() {
+            if (window.audioCtx.state === 'suspended') {
+                await window.audioCtx.resume();
+            }
+            if (window.soundWorkletNode) return;
+
+            try {
+                await window.audioCtx.audioWorklet.addModule('../../engine/hal/audio_worklet.js');
+                window.soundWorkletNode = new AudioWorkletNode(window.audioCtx, 'sound-synth-worklet');
+                window.soundWorkletNode.connect(window.audioCtx.destination);
+                
+                const response = await fetch('../../build/sound_synth.wasm');
+                const wasmBytes = await response.arrayBuffer();
+                
+                window.soundWorkletNode.port.postMessage({
+                    type: 'initWasm',
+                    wasmBytes: wasmBytes
+                });
+                console.log("AudioWorklet initialized successfully");
+            } catch (e) {
+                console.error("Failed to init AudioWorklet:", e);
+            }
+        };
+
+        window.addEventListener('keydown', window.initAudioWorklet, {once: true});
+        window.addEventListener('mousedown', window.initAudioWorklet, {once: true});
+        window.addEventListener('touchstart', window.initAudioWorklet, {once: true});
+    </script>
+
     <py-config>
         [[fetch]]
         from = "../../"

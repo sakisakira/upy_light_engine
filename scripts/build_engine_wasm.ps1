@@ -22,7 +22,17 @@ Write-Host "Building WASM side module ($out_file)..."
 emcc c_modules/core/engine_render.c c_modules/core/engine_types.c -s SIDE_MODULE=1 -O3 -o $out_file
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "WASM Build successful." -ForegroundColor Green
+    Write-Host "WASM core_engine.so Build successful." -ForegroundColor Green
 } else {
-    Write-Host "WASM Build failed." -ForegroundColor Red
+    Write-Host "WASM core_engine.so Build failed." -ForegroundColor Red
+}
+
+$sound_out_file = Join-Path $build_dir "sound_synth.wasm"
+Write-Host "Building WASM sound_synth ($sound_out_file)..."
+emcc c_modules/core/sound_synth.c -O3 -s STANDALONE_WASM=1 --no-entry -s EXPORTED_FUNCTIONS="['_sound_synth_init', '_sound_synth_set_channel', '_sound_synth_stop_all', '_sound_synth_render_wasm', '_sound_synth_get_wasm_buf_l', '_sound_synth_get_wasm_buf_r']" -o $sound_out_file
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "WASM sound_synth Build successful." -ForegroundColor Green
+} else {
+    Write-Host "WASM sound_synth Build failed." -ForegroundColor Red
 }
