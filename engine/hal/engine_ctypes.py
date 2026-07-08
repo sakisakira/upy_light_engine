@@ -119,6 +119,18 @@ core.dl_push_draw_text.restype = None
 core.render_display_list.argtypes = [CEngineFramebuffer_p, CDisplayList_p]
 core.render_display_list.restype = None
 
+core.sound_synth_init.argtypes = [ctypes.c_int]
+core.sound_synth_init.restype = None
+
+core.sound_synth_set_channel.argtypes = [ctypes.c_int, ctypes.c_uint16, ctypes.c_uint8, ctypes.c_uint8]
+core.sound_synth_set_channel.restype = None
+
+core.sound_synth_render_int16.argtypes = [Int16_p, ctypes.c_int]
+core.sound_synth_render_int16.restype = None
+
+core.sound_synth_stop_all.argtypes = []
+core.sound_synth_stop_all.restype = None
+
 # --- Base Wrapper Class ---
 
 class FramebufferBase:

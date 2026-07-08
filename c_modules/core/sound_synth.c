@@ -61,13 +61,17 @@ static int32_t sound_synth_mix_sample(void) {
                 val = (int16_t)(((pos * current_vol * 2) / period) - current_vol);
             } else if (channels[c].wave_type == 2) { // Triangle
                 uint32_t half_period = period / 2;
+                if (half_period == 0) half_period = 1; // Prevent div by zero
                 if (pos < half_period) {
                     val = (int16_t)(((pos * current_vol * 2) / half_period) - current_vol);
                 } else {
                     val = (int16_t)(current_vol - (((pos - half_period) * current_vol * 2) / half_period));
                 }
             } else if (channels[c].wave_type == 3) { // Noise
-                val = (int16_t)((_next_random() % (current_vol * 2)) - current_vol);
+                int32_t mod_val = current_vol * 2;
+                if (mod_val > 0) {
+                    val = (int16_t)((_next_random() % mod_val) - current_vol);
+                }
             }
 
             mixed_val += val;

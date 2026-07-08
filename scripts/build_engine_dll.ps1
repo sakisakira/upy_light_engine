@@ -11,7 +11,7 @@ if (-not (Test-Path "build")) {
 }
 
 Write-Host "Building core_engine.dll..."
-gcc -shared -o build/core_engine_win.dll -fPIC c_modules/core/engine_render.c c_modules/core/engine_types.c -I c_modules/core -O3 -Wall
+gcc -shared -o build/core_engine_win.dll -fPIC c_modules/core/engine_render.c c_modules/core/engine_types.c c_modules/core/sound_synth.c -I c_modules/core -O3 -Wall
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Successfully built build/core_engine.dll" -ForegroundColor Green
