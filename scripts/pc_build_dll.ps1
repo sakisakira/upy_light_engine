@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+PC C Engine DLL Build Script
+
+.DESCRIPTION
+This script builds the core_engine_win.dll for the PC (Windows) simulator using gcc.
+#>
 $ErrorActionPreference = "Stop"
 
 # Ensure we are in the project root

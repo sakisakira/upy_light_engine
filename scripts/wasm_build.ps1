@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+WASM Engine Build Script
+
+.DESCRIPTION
+This script uses emcc to compile the core C engine and sound synthesizer into WebAssembly for browser execution.
+#>
 param ()
 
 $script_dir = Split-Path -Parent $MyInvocation.MyCommand.Definition

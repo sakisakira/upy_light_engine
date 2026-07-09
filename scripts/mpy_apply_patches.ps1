@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+Applies patches to the MicroPython submodule.
+
+.DESCRIPTION
+This script is used during the Firmware Build phase to apply necessary fixes (e.g., I2S audio) to the micropython source tree before compilation.
+#>
 # MicroPythonサブモジュールへのパッチ適用スクリプト
 
 $patchFile = "..\patches\micropython_esp32_build_fixes.patch"

@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+Emscripten SDK Installation Script
+
+.DESCRIPTION
+Downloads and installs the Emscripten SDK required to build the WASM modules.
+#>
 param(
     [string]$EmsdkDir = ".\emsdk"
 )

@@ -32,12 +32,12 @@ The engine works out-of-the-box on standard MicroPython firmware, so getting sta
    First, initialize the MicroPython submodule and apply the required hardware patches (I2S and panic handler fixes) for the Cardputer Adv:
    ```powershell
    git submodule update --init
-   .\scripts\apply_patches.ps1
+   .\scripts\mpy_apply_patches.ps1
    ```
    Next, use the provided build script to compile MicroPython with PSRAM support and the custom sound engine.
    ```powershell
    # Windows (Requires WSL/Docker for the build environment)
-   .\scripts\build_c_module.ps1
+   .\scripts\mpy_build_firmware.ps1
    
    # Flash the firmware to your Cardputer (Replace COM4 with your port)
    python -m esptool --chip esp32s3 --port COM4 write_flash -z 0 micropython\ports\esp32\build-ESP32_GENERIC_S3\firmware.bin
@@ -66,3 +66,24 @@ You can run the engine locally using CPython for fast prototyping, debugging, an
    ```bash
    python main.py
    ```
+
+## Script Pipeline
+
+The `scripts/` directory contains tools organized by their target platform prefix. Here is the typical development pipeline for each platform:
+
+### 1. Cardputer Adv (MicroPython) Pipeline
+- **Step 1:** `.\scripts\mpy_apply_patches.ps1` - Applies necessary fixes (I2S, panic handler) to the MicroPython source tree.
+- **Step 2:** `.\scripts\mpy_build_firmware.ps1` - Builds the custom firmware (with C modules) using Docker.
+- **Step 3:** `.\scripts\cardputer_flash.ps1 -Port COMx` - Flashes the built firmware to the device via esptool.
+- **Step 4:** `.\scripts\cardputer_install.ps1 -Port COMx` - Copies the Python engine and game assets to the device.
+- **Step 5:** `.\scripts\cardputer_run.ps1 -Port COMx` - Runs the game on the device and streams the logs.
+- *(Utility)* `.\scripts\cardputer_clean.ps1` - Erases all user files on the device filesystem.
+
+### 2. Web Browser (WASM) Pipeline
+- **Step 1:** `.\scripts\wasm_install_emsdk.ps1` - Installs the Emscripten SDK locally.
+- **Step 2:** `.\scripts\wasm_build.ps1` - Compiles the C engine to WebAssembly (`.so` and `.wasm`).
+- **Step 3:** `python scripts\wasm_serve.py` - Starts a local HTTP server with caching disabled to test the web build.
+
+### 3. PC (Windows/macOS) Pipeline
+- **Step 1:** `.\scripts\pc_build_dll.ps1` - Compiles the C engine into a dynamic library (`core_engine_win.dll`) for the local simulator.
+- **Step 2:** `python main.py` - Runs the game using the compiled DLL.

@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+Runs the game on the Cardputer Adv.
+
+.DESCRIPTION
+Uses mpremote to execute main.py on the device and stream the logs back to the console.
+#>
 param(
     [string]$Port = ""
 )

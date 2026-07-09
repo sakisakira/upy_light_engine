@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+Installs the engine and game files to the Cardputer Adv.
+
+.DESCRIPTION
+Copies the engine framework, assets (fonts/images), native modules, and main.py to the device.
+#>
 param(
     [string]$Port = ""
 )

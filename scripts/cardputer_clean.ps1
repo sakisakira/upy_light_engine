@@ -1,3 +1,10 @@
+<#
+.SYNOPSIS
+Cleans up the Cardputer Adv filesystem.
+
+.DESCRIPTION
+Connects via mpremote and deletes all user files and directories recursively.
+#>
 param(
     [string]$Port = ""
 )

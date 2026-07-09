@@ -1,11 +1,10 @@
 <#
 .SYNOPSIS
-MicroPython C Module Build Script
+MicroPython C Module & Firmware Build Script
 
 .DESCRIPTION
-Uses Docker container to build C modules and firmware without polluting local env.
+This script is used to build the custom MicroPython firmware containing the C engine modules for the Cardputer Adv. It runs inside a Docker container.
 #>
-
 $ErrorActionPreference = "Stop"
 
 $IMAGE_NAME = "upy_light_engine_builder"
@@ -16,7 +15,7 @@ Write-Host "========== Docker Build Environment for MicroPython C Modules ======
 $imageExists = docker images -q $IMAGE_NAME
 if (-not $imageExists) {
     Write-Host "[INFO] Building Docker image '$IMAGE_NAME'..."
-    docker build -t $IMAGE_NAME .
+    docker build -f scripts/mpy_build.Dockerfile -t $IMAGE_NAME .
     if ($LASTEXITCODE -ne 0) {
         Write-Error "[ERROR] Docker build failed."
         exit $LASTEXITCODE
