@@ -1,8 +1,11 @@
 import sys
 
 class ImageBufferManager:
-    def __init__(self, size):
-        self.buffer = bytearray(size)
+    def __init__(self, size_or_buffer):
+        if type(size_or_buffer) is int:
+            self.buffer = bytearray(size_or_buffer)
+        else:
+            self.buffer = size_or_buffer
         self.offset = 0
         
     def alloc(self, size):

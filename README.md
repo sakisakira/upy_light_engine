@@ -87,3 +87,11 @@ The `scripts/` directory contains tools organized by their target platform prefi
 ### 3. PC (Windows/macOS) Pipeline
 - **Step 1:** `.\scripts\pc_build_dll.ps1` - Compiles the C engine into a dynamic library (`core_engine_win.dll`) for the local simulator.
 - **Step 2:** `python main.py` - Runs the game using the compiled DLL.
+
+## Investigation & Debugging Scripts
+
+The `investigation/` directory contains tools specifically designed to help debug issues on the Cardputer Adv hardware.
+
+- **`read_serial.py`**: A customized serial monitor that connects to the Cardputer (default COM4) and prints raw output with optional color-coding and timestamping. Much lighter than full `mpremote`.
+- **`soft_reset.py`**: Uses raw `pyserial` commands to forcefully send `Ctrl-C` (`\x03`) and Soft-Reset (`\x04`) bytes directly to the MicroPython REPL. Useful for breaking out of infinite loops or unyielding crashes without touching the physical reset button.
+- **`check_free_heap.py`**: A small utility to read memory statistics if injected into the system.
