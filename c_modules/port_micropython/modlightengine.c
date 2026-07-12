@@ -304,14 +304,19 @@ static mp_obj_t dl_meth_push_draw_text(size_t n_args, const mp_obj_t *args) {
     mp_obj_t *lookup_items;
     mp_obj_get_array(lookup_list, &lookup_len, &lookup_items);
     
+    int16_t *lookup_ptr = NULL;
     int16_t lookup_array[256];
-    for(size_t i = 0; i < lookup_len && i < 256; i++) {
-        lookup_array[i] = (int16_t)get_int_from_obj(lookup_items[i]);
+    
+    if (lookup_len > 0) {
+        for(size_t i = 0; i < lookup_len && i < 256; i++) {
+            lookup_array[i] = (int16_t)get_int_from_obj(lookup_items[i]);
+        }
+        lookup_ptr = lookup_array;
     }
     
     int tint = mp_obj_get_int(args[9]);
     
-    dl_push_draw_text(self->dl, sanitize_x(x), sanitize_y(y), &font->img, char_w, char_h, columns, text, text_len, lookup_array, tint);
+    dl_push_draw_text(self->dl, sanitize_x(x), sanitize_y(y), &font->img, char_w, char_h, columns, text, text_len, lookup_ptr, tint);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_text_obj, 10, 10, dl_meth_push_draw_text);
@@ -558,6 +563,32 @@ static mp_obj_t mod_sync(void) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(mod_sync_obj, mod_sync);
 
+static mp_obj_t mod_malloc(mp_obj_t size_in) {
+    size_t size = mp_obj_get_int(size_in);
+    void *ptr = heap_caps_malloc(size, MALLOC_CAP_8BIT);
+    if (!ptr) {
+        mp_raise_msg(&mp_type_MemoryError, MP_ROM_QSTR(MP_QSTR_Failed_to_allocate_from_FreeRTOS_heap));
+    }
+    return mp_obj_new_bytearray_by_ref(size, ptr);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_malloc_obj, mod_malloc);
+
+static mp_obj_t mod_free(mp_obj_t buf_in) {
+    mp_buffer_info_t bufinfo;
+    if (mp_get_buffer(buf_in, &bufinfo, MP_BUFFER_RW)) {
+        if (bufinfo.buf != NULL) {
+            heap_caps_free(bufinfo.buf);
+        }
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_free_obj, mod_free);
+
+static mp_obj_t mod_get_free_heap(void) {
+    return mp_obj_new_int(heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_get_free_heap_obj, mod_get_free_heap);
+
 static const mp_rom_map_elem_t lightengine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR__lightengine) },
     { MP_ROM_QSTR(MP_QSTR_Image), MP_ROM_PTR(&lightengine_Image_type) },
@@ -570,6 +601,9 @@ static const mp_rom_map_elem_t lightengine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_init_display), MP_ROM_PTR(&mod_init_display_obj) },
     { MP_ROM_QSTR(MP_QSTR_spi_write_cmd), MP_ROM_PTR(&mod_spi_write_cmd_obj) },
     { MP_ROM_QSTR(MP_QSTR_spi_write_data), MP_ROM_PTR(&mod_spi_write_data_obj) },
+    { MP_ROM_QSTR(MP_QSTR_malloc), MP_ROM_PTR(&mod_malloc_obj) },
+    { MP_ROM_QSTR(MP_QSTR_free), MP_ROM_PTR(&mod_free_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_free_heap), MP_ROM_PTR(&mod_get_free_heap_obj) },
     };
 static MP_DEFINE_CONST_DICT(lightengine_module_globals, lightengine_module_globals_table);
 

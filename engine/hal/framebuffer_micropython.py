@@ -17,19 +17,12 @@ class Framebuffer:
         self.width = width
         self.height = height
         self.format = "INDEX8"
-        self.buf_idx = 0
             
         import _lightengine
         if buffer is None:
-            self._c_fbs = [
-                _lightengine.Framebuffer(self.width, self.height, 2, None),
-                _lightengine.Framebuffer(self.width, self.height, 2, None)
-            ]
+            self._c_fb = _lightengine.Framebuffer(self.width, self.height, 2, None)
         else:
-            self._c_fbs = [
-                _lightengine.Framebuffer(self.width, self.height, 2, buffer),
-                _lightengine.Framebuffer(self.width, self.height, 2, None)
-            ]
+            self._c_fb = _lightengine.Framebuffer(self.width, self.height, 2, buffer)
         
         self.dls = [_lightengine.DisplayList(), _lightengine.DisplayList()]
         self.dl_idx = 0
@@ -83,7 +76,8 @@ class Framebuffer:
     def text(self, font, text, x, y, color=1, scale=1.0):
         text_bytes = text if type(text) is bytes or type(text) is bytearray else text.encode('ascii', 'ignore')
         self.dl_strings[self.dl_idx].append(text_bytes)
-        self.dl.push_draw_text(int(x), int(y), font.image._c_image, font.char_w, font.char_h, font.cols, text_bytes, -1 if color is None else color)
+        col_tbl = ()
+        self.dl.push_draw_text(int(x), int(y), font.image._c_image, font.char_w, font.char_h, font.cols, text_bytes, col_tbl, -1 if color is None else color)
 
 # ---- Window and Game Loop Management ----
 screen = Framebuffer(240, 135)
@@ -112,18 +106,16 @@ def run(update, draw, fps=30):
         import gc
         
         # Submit first empty frame to bootstrap pipeline
-        screen.buf_idx = 1
         screen.dl_idx = 1
         display.set_window(0, 0, 239, 134)
-        _lightengine.submit_and_send(screen._c_fbs[screen.buf_idx], screen.dls[screen.dl_idx], None)
+        _lightengine.submit_and_send(screen._c_fb, screen.dls[screen.dl_idx], None)
         
         while True:
             t0 = time.ticks_ms()
             engine_time.clock.tick()
             
-            # Switch DisplayList and Buffer
+            # Switch DisplayList
             screen.dl_idx = 1 - screen.dl_idx
-            screen.buf_idx = 1 - screen.buf_idx
             screen.dl_strings[screen.dl_idx].clear()
             screen.dl.clear()
             
@@ -143,12 +135,12 @@ def run(update, draw, fps=30):
             # Submit newly built display list for Core 1 to start rendering into CURRENT buffer AND sending it via SPI
             from engine.palette import colors565
             profiler.start("submit")
-            _lightengine.submit_and_send(screen._c_fbs[screen.buf_idx], screen.dl, colors565)
+            _lightengine.submit_and_send(screen._c_fb, screen.dl, colors565)
             profiler.end("submit")
             
             # Print free memory every 600 frames to monitor leaks
             if engine_time.clock.frame_count % 600 == 0:
-                print(f"FPS: {engine_time.clock.fps} | Free Mem: {gc.mem_free()} bytes")
+                print(f"FPS: {engine_time.clock.fps} | GC Free: {gc.mem_free()} bytes | FreeRTOS Free: {_lightengine.get_free_heap()} bytes")
                 import micropython
                 micropython.mem_info()
             
