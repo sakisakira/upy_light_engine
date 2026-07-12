@@ -11,6 +11,15 @@
 #include <string.h>
 
 #include "engine_types.h"
+#include "core/engine_render.h"
+
+// Helper to accept both ints and floats for coordinates/dimensions
+static int32_t get_int_from_obj(mp_obj_t obj) {
+    if (mp_obj_is_float(obj)) {
+        return (int32_t)mp_obj_get_float(obj);
+    }
+    return (int32_t)mp_obj_get_int(obj);
+}
 
 // --- Image Type ---
 typedef struct _lightengine_Image_obj_t {
@@ -192,82 +201,120 @@ static MP_DEFINE_CONST_FUN_OBJ_2(dl_push_clear_obj, dl_meth_push_clear);
 
 static mp_obj_t dl_meth_push_pset(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    dl_push_pset(self->dl, mp_obj_get_int(args[1]), mp_obj_get_int(args[2]), mp_obj_get_int(args[3]));
+    int32_t x = get_int_from_obj(args[1]);
+    int32_t y = get_int_from_obj(args[2]);
+    if (!is_visible(x, y, 1, 1)) return mp_const_none;
+    dl_push_pset(self->dl, sanitize_x(x), sanitize_y(y), mp_obj_get_int(args[3]));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_pset_obj, 4, 4, dl_meth_push_pset);
 
 static mp_obj_t dl_meth_push_line(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    dl_push_line(self->dl, mp_obj_get_int(args[1]), mp_obj_get_int(args[2]), mp_obj_get_int(args[3]), mp_obj_get_int(args[4]), mp_obj_get_int(args[5]));
+    int32_t x1 = get_int_from_obj(args[1]);
+    int32_t y1 = get_int_from_obj(args[2]);
+    int32_t x2 = get_int_from_obj(args[3]);
+    int32_t y2 = get_int_from_obj(args[4]);
+    
+    int32_t min_x = (x1 < x2) ? x1 : x2;
+    int32_t max_x = (x1 > x2) ? x1 : x2;
+    int32_t min_y = (y1 < y2) ? y1 : y2;
+    int32_t max_y = (y1 > y2) ? y1 : y2;
+    if (!is_visible(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)) return mp_const_none;
+    
+    dl_push_line(self->dl, sanitize_x(x1), sanitize_y(y1), sanitize_x(x2), sanitize_y(y2), mp_obj_get_int(args[5]));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_line_obj, 6, 6, dl_meth_push_line);
 
 static mp_obj_t dl_meth_push_fill_rect(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    dl_push_fill_rect(self->dl, mp_obj_get_int(args[1]), mp_obj_get_int(args[2]), mp_obj_get_int(args[3]), mp_obj_get_int(args[4]), mp_obj_get_int(args[5]));
+    int32_t x = get_int_from_obj(args[1]);
+    int32_t y = get_int_from_obj(args[2]);
+    int32_t w = get_int_from_obj(args[3]);
+    int32_t h = get_int_from_obj(args[4]);
+    if (!is_visible(x, y, w, h)) return mp_const_none;
+    
+    dl_push_fill_rect(self->dl, sanitize_x(x), sanitize_y(y), (int16_t)w, (int16_t)h, mp_obj_get_int(args[5]));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_fill_rect_obj, 6, 6, dl_meth_push_fill_rect);
 
 static mp_obj_t dl_meth_push_draw_sprite(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    int cx = mp_obj_get_int(args[1]);
-    int cy = mp_obj_get_int(args[2]);
+    int32_t cx = get_int_from_obj(args[1]);
+    int32_t cy = get_int_from_obj(args[2]);
     float scale = mp_obj_get_float(args[3]);
     float angle = mp_obj_get_float(args[4]);
     lightengine_Image_obj_t *img = MP_OBJ_TO_PTR(args[5]);
-    int u = mp_obj_get_int(args[6]);
-    int v = mp_obj_get_int(args[7]);
-    int w = mp_obj_get_int(args[8]);
-    int h = mp_obj_get_int(args[9]);
+    int32_t u = get_int_from_obj(args[6]);
+    int32_t v = get_int_from_obj(args[7]);
+    int32_t w = get_int_from_obj(args[8]);
+    int32_t h = get_int_from_obj(args[9]);
     int colkey = mp_obj_get_int(args[10]);
     int tint = mp_obj_get_int(args[11]);
     
-    dl_push_draw_sprite(self->dl, cx, cy, scale, angle, &img->img, u, v, w, h, colkey, tint);
+    int32_t scaled_w = (int32_t)(w * scale);
+    int32_t scaled_h = (int32_t)(h * scale);
+    if (!is_visible(cx - scaled_w/2, cy - scaled_h/2, scaled_w, scaled_h)) return mp_const_none;
+    
+    dl_push_draw_sprite(self->dl, sanitize_x(cx), sanitize_y(cy), scale, angle, &img->img, (int16_t)u, (int16_t)v, (int16_t)w, (int16_t)h, colkey, tint);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_sprite_obj, 12, 12, dl_meth_push_draw_sprite);
 
 static mp_obj_t dl_meth_push_blt(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    int x = mp_obj_get_int(args[1]);
-    int y = mp_obj_get_int(args[2]);
+    int32_t x = get_int_from_obj(args[1]);
+    int32_t y = get_int_from_obj(args[2]);
     lightengine_Image_obj_t *img = MP_OBJ_TO_PTR(args[3]);
-    int u = mp_obj_get_int(args[4]);
-    int v = mp_obj_get_int(args[5]);
-    int w = mp_obj_get_int(args[6]);
-    int h = mp_obj_get_int(args[7]);
+    int32_t u = get_int_from_obj(args[4]);
+    int32_t v = get_int_from_obj(args[5]);
+    int32_t w = get_int_from_obj(args[6]);
+    int32_t h = get_int_from_obj(args[7]);
     int colkey = mp_obj_get_int(args[8]);
     int tint = mp_obj_get_int(args[9]);
     
-    dl_push_blt(self->dl, x, y, &img->img, u, v, w, h, colkey, tint);
+    if (!is_visible(x, y, w, h)) return mp_const_none;
+    
+    dl_push_blt(self->dl, sanitize_x(x), sanitize_y(y), &img->img, (int16_t)u, (int16_t)v, (int16_t)w, (int16_t)h, colkey, tint);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_blt_obj, 10, 10, dl_meth_push_blt);
 
 static mp_obj_t dl_meth_push_draw_text(size_t n_args, const mp_obj_t *args) {
     lightengine_DisplayList_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    int x = mp_obj_get_int(args[1]);
-    int y = mp_obj_get_int(args[2]);
+    int32_t x = get_int_from_obj(args[1]);
+    int32_t y = get_int_from_obj(args[2]);
     lightengine_Image_obj_t *font = MP_OBJ_TO_PTR(args[3]);
-    int char_w = mp_obj_get_int(args[4]);
-    int char_h = mp_obj_get_int(args[5]);
-    int columns = mp_obj_get_int(args[6]);
+    int32_t char_w = get_int_from_obj(args[4]);
+    int32_t char_h = get_int_from_obj(args[5]);
+    int columns = get_int_from_obj(args[6]);
     
     mp_buffer_info_t text_bufinfo;
     mp_get_buffer_raise(args[7], &text_bufinfo, MP_BUFFER_READ);
     const uint8_t *text = text_bufinfo.buf;
     int text_len = text_bufinfo.len;
     
-    int16_t *lookup = NULL;
-    int tint = mp_obj_get_int(args[8]);
+    int32_t text_total_w = char_w * text_len; // simple estimation for single line text
+    if (!is_visible(x, y, text_total_w, char_h)) return mp_const_none;
     
-    dl_push_draw_text(self->dl, x, y, &font->img, char_w, char_h, columns, text, text_len, lookup, tint);
+    mp_obj_t lookup_list = args[8];
+    size_t lookup_len;
+    mp_obj_t *lookup_items;
+    mp_obj_get_array(lookup_list, &lookup_len, &lookup_items);
+    
+    int16_t lookup_array[256];
+    for(size_t i = 0; i < lookup_len && i < 256; i++) {
+        lookup_array[i] = (int16_t)get_int_from_obj(lookup_items[i]);
+    }
+    
+    int tint = mp_obj_get_int(args[9]);
+    
+    dl_push_draw_text(self->dl, sanitize_x(x), sanitize_y(y), &font->img, char_w, char_h, columns, text, text_len, lookup_array, tint);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_text_obj, 9, 9, dl_meth_push_draw_text);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dl_push_draw_text_obj, 10, 10, dl_meth_push_draw_text);
 
 static const mp_rom_map_elem_t dl_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_clear), MP_ROM_PTR(&dl_clear_obj) },

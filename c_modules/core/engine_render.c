@@ -1,4 +1,6 @@
 #include "engine_render.h"
+#include "engine_types.h"
+// No longer relying on standard assert directly, but keeping it just in case
 #include <assert.h>
 #include <math.h>
 #include <stddef.h>
@@ -12,15 +14,14 @@ static void render_clear(EngineFramebuffer *framebuffer, uint16_t color) {
       framebuffer->buffer[i] = c8;
     }
   } else {
-    assert(0 && "Unsupported framebuffer format in render_clear");
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_clear");
   }
 }
 
 static void render_pset(EngineFramebuffer *framebuffer, int16_t x, int16_t y,
                         uint16_t color) {
   if (framebuffer->format != kFormatIndex8) {
-    assert(0 && "Unsupported framebuffer format in render_pset");
-    return;
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_pset");
   }
   if (x >= 0 && x < framebuffer->width && y >= 0 && y < framebuffer->height) {
     framebuffer->buffer[y * framebuffer->width + x] = (uint8_t)color;
@@ -30,8 +31,7 @@ static void render_pset(EngineFramebuffer *framebuffer, int16_t x, int16_t y,
 static void render_line(EngineFramebuffer *framebuffer, int16_t x1, int16_t y1,
                         int16_t x2, int16_t y2, uint16_t color) {
   if (framebuffer->format != kFormatIndex8) {
-    assert(0 && "Unsupported framebuffer format in render_line");
-    return;
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_line");
   }
   int dx = abs(x2 - x1);
   int sx = x1 < x2 ? 1 : -1;
@@ -77,7 +77,7 @@ static void render_fill_rect(EngineFramebuffer *framebuffer, int16_t x,
       }
     }
   } else {
-    assert(0 && "Unsupported framebuffer format in render_fill_rect");
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_fill_rect");
   }
 }
 
@@ -85,8 +85,7 @@ static void render_blt(EngineFramebuffer *framebuffer, int16_t x, int16_t y,
                        EngineImage *img, int16_t u, int16_t v, int16_t w,
                        int16_t h, uint16_t colkey, int tint) {
   if (framebuffer->format != kFormatIndex8 || img->format != kFormatIndex8) {
-    assert(0 && "Unsupported format in render_blt");
-    return;
+    ENGINE_ASSERT_RETURN(0, "Unsupported format in render_blt");
   }
 
   int16_t start_x = (x < 0) ? 0 : x;
@@ -120,8 +119,7 @@ static void render_draw_sprite(EngineFramebuffer *framebuffer, int16_t cx,
                                int16_t w, int16_t h, uint16_t colkey_in,
                                int tint) {
   if (framebuffer->format != kFormatIndex8) {
-    assert(0 && "Unsupported framebuffer format in render_draw_sprite");
-    return;
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_draw_sprite");
   }
   if (scale <= 0.0f)
     return;
@@ -213,8 +211,7 @@ static void render_draw_text(EngineFramebuffer *framebuffer, int16_t x,
                              int char_h, int columns, const uint8_t *text,
                              int text_len, int16_t *lookup, int tint) {
   if (framebuffer->format != kFormatIndex8) {
-    assert(0 && "Unsupported framebuffer format in render_draw_text");
-    return;
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_draw_text");
   }
   if (font == NULL)
     return;
@@ -283,8 +280,7 @@ void render_display_list(EngineFramebuffer *framebuffer,
   if (framebuffer == NULL || display_list == NULL)
     return;
   if (framebuffer->format != kFormatIndex8) {
-    assert(0 && "Unsupported framebuffer format in render_display_list");
-    return; // Currently only kFormatIndex8 supported for drawing
+    ENGINE_ASSERT_RETURN(0, "Unsupported framebuffer format in render_display_list");
   }
 
   for (int i = 0; i < display_list->count; i++) {

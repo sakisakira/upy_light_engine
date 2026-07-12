@@ -3,6 +3,58 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+// PC environment (Windows, macOS, Linux desktop) uses abort() to fail fast
+#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+  #define ENGINE_ABORT() abort()
+#else
+  // Microcontrollers and WASM fail safely without freezing the device
+  #define ENGINE_ABORT() do {} while(0)
+#endif
+
+#define ENGINE_ASSERT(cond, msg) \
+    do { \
+        if (!(cond)) { \
+            printf("[Engine Error] %s:%d - %s\n", __FILE__, __LINE__, (msg)); \
+            ENGINE_ABORT(); \
+        } \
+    } while (0)
+
+#define ENGINE_ASSERT_RETURN(cond, msg) \
+    do { \
+        if (!(cond)) { \
+            printf("[Engine Error] %s:%d - %s\n", __FILE__, __LINE__, (msg)); \
+            ENGINE_ABORT(); \
+            return; \
+        } \
+    } while (0)
+
+#define ENGINE_MAX_WIDTH 320
+#define ENGINE_MAX_HEIGHT 240
+
+// Sanitize coordinates to prevent wraparound during int16_t conversion and calculations.
+static inline int16_t sanitize_x(int32_t x) {
+    if (x < INT16_MIN) return INT16_MIN;
+    if (x > INT16_MAX) return INT16_MAX;
+    return (int16_t)x;
+}
+
+static inline int16_t sanitize_y(int32_t y) {
+    if (y < INT16_MIN) return INT16_MIN;
+    if (y > INT16_MAX) return INT16_MAX;
+    return (int16_t)y;
+}
+
+// Culling: check if a bounding box is completely outside the screen
+static inline bool is_visible(int32_t x, int32_t y, int32_t w, int32_t h) {
+    if (x + w < 0) return false; // Completely to the left
+    if (x > ENGINE_MAX_WIDTH) return false; // Completely to the right
+    if (y + h < 0) return false; // Completely above
+    if (y > ENGINE_MAX_HEIGHT) return false; // Completely below
+    return true;
+}
 
 enum {
     kFormatRgb565 = 0,
