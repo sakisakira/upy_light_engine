@@ -54,6 +54,10 @@ class Image:
     _cache = {}
 
     @classmethod
+    def clear_cache(cls):
+        cls._cache.clear()
+        
+    @classmethod
     def load(cls, filename, buffer=None):
         if filename in cls._cache:
             return cls._cache[filename]

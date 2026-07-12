@@ -149,6 +149,8 @@ def run(update, draw, fps=30):
             # Print free memory every 600 frames to monitor leaks
             if engine_time.clock.frame_count % 600 == 0:
                 print(f"FPS: {engine_time.clock.fps} | Free Mem: {gc.mem_free()} bytes")
+                import micropython
+                micropython.mem_info()
             
             profiler.start("sleep")
             t1 = time.ticks_ms()

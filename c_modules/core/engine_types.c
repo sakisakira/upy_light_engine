@@ -23,6 +23,8 @@ void dl_init(DisplayList *display_list) {
 
 void dl_clear(DisplayList *display_list) {
     if (display_list != NULL) {
+        #include <string.h>
+        memset(display_list->commands, 0, sizeof(RenderCommand) * display_list->count);
         display_list->count = 0;
     }
 }
