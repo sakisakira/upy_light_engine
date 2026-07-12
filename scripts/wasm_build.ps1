@@ -26,7 +26,7 @@ if (-Not (Test-Path $build_dir)) {
 $out_file = Join-Path $build_dir "core_engine.so"
 
 Write-Host "Building WASM side module ($out_file)..."
-emcc c_modules/core/engine_render.c c_modules/core/engine_types.c -s SIDE_MODULE=1 -O3 -o $out_file
+emcc c_modules/core/engine_render.c c_modules/core/engine_types.c c_modules/core/sound_synth.c -s SIDE_MODULE=1 -O3 -o $out_file
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "WASM core_engine.so Build successful." -ForegroundColor Green

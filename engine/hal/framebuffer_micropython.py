@@ -33,12 +33,14 @@ class Framebuffer:
         
         self.dls = [_lightengine.DisplayList(), _lightengine.DisplayList()]
         self.dl_idx = 0
+        self.dl_strings = [[], []]
 
     @property
     def dl(self):
         return self.dls[self.dl_idx]
 
     def clear(self, col=0):
+        self.dl_strings[self.dl_idx].clear()
         self.dl.push_clear(col)
         
     def fill(self, col=0):
@@ -80,6 +82,7 @@ class Framebuffer:
 
     def text(self, font, text, x, y, color=1, scale=1.0):
         text_bytes = text if type(text) is bytes or type(text) is bytearray else text.encode('ascii', 'ignore')
+        self.dl_strings[self.dl_idx].append(text_bytes)
         self.dl.push_draw_text(int(x), int(y), font.image._c_image, font.char_w, font.char_h, font.cols, text_bytes, -1 if color is None else color)
 
 # ---- Window and Game Loop Management ----
@@ -121,6 +124,7 @@ def run(update, draw, fps=30):
             # Switch DisplayList and Buffer
             screen.dl_idx = 1 - screen.dl_idx
             screen.buf_idx = 1 - screen.buf_idx
+            screen.dl_strings[screen.dl_idx].clear()
             screen.dl.clear()
             
             profiler.start("update")

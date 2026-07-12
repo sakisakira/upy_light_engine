@@ -1,5 +1,27 @@
 import sys
 
+class ImageBufferManager:
+    def __init__(self, size):
+        self.buffer = bytearray(size)
+        self.offset = 0
+        
+    def alloc(self, size):
+        if self.offset + size > len(self.buffer):
+            return None
+        mv = memoryview(self.buffer)[self.offset : self.offset + size]
+        self.offset += size
+        return mv
+        
+    def reset(self):
+        self.offset = 0
+
+_global_buffer_manager = None
+
+def set_global_buffer_manager(manager):
+    global _global_buffer_manager
+    _global_buffer_manager = manager
+
+
 class Image:
     """
     Container holding image (sprite) data in INDEX8 format.
@@ -32,7 +54,7 @@ class Image:
     _cache = {}
 
     @classmethod
-    def load(cls, filename):
+    def load(cls, filename, buffer=None):
         if filename in cls._cache:
             return cls._cache[filename]
             
@@ -47,7 +69,17 @@ class Image:
             if header[4] != 2:
                 raise ValueError("Unsupported UIMG version (expected v2 INDEX8)")
             width, height = struct.unpack("<HH", header[6:10])
-            data = bytearray(width * height)
+            
+            if buffer is None and _global_buffer_manager is not None:
+                buffer = _global_buffer_manager.alloc(width * height)
+
+            if buffer is None:
+                data = bytearray(width * height)
+            else:
+                if len(buffer) < width * height:
+                    raise ValueError("Buffer too small for image")
+                data = buffer[:width*height]
+                
             f.readinto(data)
             
         img = cls(width, height, data)
