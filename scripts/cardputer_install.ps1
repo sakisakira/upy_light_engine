@@ -42,14 +42,22 @@ if ($img_files) {
     mpremote @mpremote_args cp $img_files :assets/images/
 }
 
-# 4. ネイティブモジュール(.mpy)のコピー
+# 4. サウンドのコピー
+Write-Host "Copying sounds..."
+mpremote @mpremote_args fs mkdir :assets/sounds 2> $null
+$sound_files = Get-ChildItem -Path .\assets\sounds\*.ubgm | Select-Object -ExpandProperty FullName
+if ($sound_files) {
+    mpremote @mpremote_args cp $sound_files :assets/sounds/
+}
+
+# 5. ネイティブモジュール(.mpy)のコピー
 Write-Host "Copying native modules (.mpy)..."
 $mpy_files = Get-ChildItem -Path .\*.mpy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
 if ($mpy_files) {
     mpremote @mpremote_args cp $mpy_files :
 }
 
-# 5. main.py のコピー
+# 6. main.py のコピー
 Write-Host "Copying main.py..."
 mpremote @mpremote_args cp .\main.py :
 

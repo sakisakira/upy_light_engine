@@ -170,11 +170,10 @@ def update():
     
     if frames == 120:
         # Chord progression (Do -> Do-Mi -> Do-Mi-So -> Do-Mi-So-Do)
-        mml = "T100 O4 V100 C2 C4 C4 C4, T100 O4 V100 R2 E4 E4 E4, T100 O4 V100 R2 R4 G4 G4, T100 O4 V100 R2 R4 R4 >C4"
-        sound.play_mml(mml)
+        sound.play_ubgm("assets/sounds/main_chord.ubgm")
         
     if frames == 360:
-        sound.play_mml("$ V32 T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
+        sound.play_ubgm("assets/sounds/main_loop.ubgm")
     
     if inp.button(inp.Button_Left):
         x -= 2

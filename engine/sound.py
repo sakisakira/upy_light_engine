@@ -28,6 +28,52 @@ def play_mml(mml_string):
     if intro_tracks or loop_tracks:
         _hal.play_sequence(intro_tracks, loop_tracks)
 
+class _UBGMTrack:
+    def __init__(self, data, offset, count):
+        self.data = data
+        self.offset = offset
+        self.count = count
+        
+    def __len__(self):
+        return self.count
+        
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.count:
+            raise IndexError()
+        import struct
+        return struct.unpack_from('<HHBB', self.data, self.offset + idx * 6)
+
+def load_ubgm(filepath):
+    """Load a .ubgm binary file and return (intro_tracks, loop_tracks)."""
+    with open(filepath, 'rb') as f:
+        data = f.read()
+        
+    import struct
+    magic, version, num_tracks = struct.unpack_from('<4sBB', data, 0)
+    if magic != b'UBGM':
+        raise ValueError("Invalid UBGM file format")
+        
+    intro_tracks = []
+    loop_tracks = []
+    
+    for ch in range(num_tracks):
+        offset = 16 + ch * 12
+        ic, lc, io, lo = struct.unpack_from('<HHII', data, offset)
+        
+        intro_tracks.append(_UBGMTrack(data, io, ic) if ic > 0 else [])
+        loop_tracks.append(_UBGMTrack(data, lo, lc) if lc > 0 else [])
+        
+    return intro_tracks, loop_tracks
+
+def play_ubgm(filepath):
+    """Load and play a .ubgm binary file."""
+    intro_tracks, loop_tracks = load_ubgm(filepath)
+    _hal.play_sequence(intro_tracks, loop_tracks)
+
+def play_loaded_ubgm(intro_tracks, loop_tracks):
+    """Play UBGM tracks that were already loaded via load_ubgm()."""
+    _hal.play_sequence(intro_tracks, loop_tracks)
+
 def play_sfx(name):
     """Play a predefined sound effect."""
     # Presets: (freq, duration_ms, volume, wave_type)
