@@ -4,10 +4,6 @@ try:
 except ImportError:
     pass
 
-try:
-    import graphics_engine
-except ImportError:
-    graphics_engine = None
 
 class Framebuffer:
     """

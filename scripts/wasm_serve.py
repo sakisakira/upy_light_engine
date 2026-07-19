@@ -1,9 +1,9 @@
-\"\"\"
+"""
 WASM Local Server
 
 This script serves the WebAssembly simulator locally on port 8000 without caching,
 ensuring you always test the latest build.
-\"\"\"
+"""
 import http.server
 import socketserver
 
