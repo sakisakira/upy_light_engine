@@ -109,8 +109,10 @@ class SoundHAL:
             self.track_indices[channel] = 0
             self.track_end_times[channel] = time.ticks_ms()
             self.track_state[channel] = "oneshot"
-            self._start_note_for_track(channel)
-            
+            note = self._fetch_next_note(channel)
+            if note:
+                self._start_fetched_note(channel, note)
+                
     def play_sequence(self, intro_tracks, loop_tracks=None):
         if not self.is_ready: return
         self.stop()
@@ -149,14 +151,20 @@ class SoundHAL:
             self.audio_thread_running = True
             _thread.start_new_thread(self._audio_thread, ())
         else:
-            now = time.ticks_ms()
+            notes_to_play = []
             for ch in range(4):
                 if ch < len(target_tracks) and target_tracks[ch]:
                     self.tracks[ch] = target_tracks[ch]
                     self.track_indices[ch] = 0
-                    self.track_end_times[ch] = now
                     self.track_state[ch] = state
-                    self._start_note_for_track(ch)
+                    note = self._fetch_next_note(ch)
+                    if note:
+                        notes_to_play.append((ch, note))
+            
+            real_start_time = time.ticks_ms()
+            for ch, note in notes_to_play:
+                self.track_end_times[ch] = real_start_time
+                self._start_fetched_note(ch, note)
 
     def _audio_thread(self):
         amplitude = 8000
@@ -211,9 +219,9 @@ class SoundHAL:
         if self.i2s:
             self.i2s.write(self.silence_buf)
             
-    def _start_note_for_track(self, ch):
+    def _fetch_next_note(self, ch):
         if not self.tracks[ch]:
-            return
+            return None
             
         idx = self.track_indices[ch]
         if idx >= len(self.tracks[ch]):
@@ -226,19 +234,19 @@ class SoundHAL:
                 self.track_indices[ch] = 0
                 idx = 0
             else:
-                if self.mode == "c_module":
-                    self.c_engine.set_channel(ch, 0, 0, 0)
                 self.tracks[ch] = None
                 self.track_state[ch] = "stopped"
-                return
+                return None
             
-        note = self.tracks[ch][idx]
+        return self.tracks[ch][idx]
+
+    def _start_fetched_note(self, ch, note):
         freq = note[0]
         duration = note[1]
         volume = note[2] if len(note) > 2 else 64
         wave_type = note[3] if len(note) > 3 else 0
         
-        self.track_end_times[ch] = time.ticks_add(self.track_end_times[ch] if idx > 0 else time.ticks_ms(), duration)
+        self.track_end_times[ch] = time.ticks_add(self.track_end_times[ch], duration)
         
         if self.mode == "c_module":
             self.c_engine.set_channel(ch, freq, wave_type, volume)
@@ -251,11 +259,20 @@ class SoundHAL:
         if not self.is_ready: return
         
         now = time.ticks_ms()
+        notes_to_play = []
         for ch in range(4):
             if self.tracks[ch]:
                 if time.ticks_diff(self.track_end_times[ch], now) <= 0:
                     self.track_indices[ch] += 1
-                    self._start_note_for_track(ch)
+                    note = self._fetch_next_note(ch)
+                    if note:
+                        notes_to_play.append((ch, note))
+                    else:
+                        if self.mode == "c_module":
+                            self.c_engine.set_channel(ch, 0, 0, 0)
+                            
+        for ch, note in notes_to_play:
+            self._start_fetched_note(ch, note)
 
     def stop(self):
         self.stop_request = True
