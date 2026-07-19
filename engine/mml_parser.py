@@ -23,6 +23,7 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
     octave = 4
     default_length = 4
     volume = initial_volume
+    wave_type = 0
     
     notes = []
     
@@ -35,6 +36,8 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
             return default_val
         return int(mml[start:i])
         
+    tied = False
+    
     while i < len(mml):
         c = mml[i]
         i += 1
@@ -42,6 +45,12 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
         if c in (' ', '\t', '\n', '\r'):
             continue
             
+        elif c == '&':
+            tied = True
+            continue
+            
+        elif c == '@':
+            wave_type = get_num(wave_type)
         elif c == 't':
             tempo = get_num(tempo)
         elif c == 'o':
@@ -77,7 +86,17 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
             if dotted:
                 duration_ms *= 1.5
                 
-            notes.append((int(freq), int(duration_ms), volume))
+            freq_int = int(freq)
+            duration_int = int(duration_ms)
+            
+            if tied and notes and notes[-1][0] == freq_int and (len(notes[-1]) < 4 or notes[-1][3] == wave_type):
+                prev = notes.pop()
+                prev_freq, prev_dur, prev_vol = prev[0], prev[1], prev[2]
+                notes.append((prev_freq, prev_dur + duration_int, prev_vol, wave_type))
+            else:
+                notes.append((freq_int, duration_int, volume, wave_type))
+                
+            tied = False
             
         elif c == 'r':
             length = get_num(default_length)
@@ -91,7 +110,17 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
             if dotted:
                 duration_ms *= 1.5
                 
-            notes.append((0, int(duration_ms), 0))
+            duration_int = int(duration_ms)
+            
+            if tied and notes and notes[-1][0] == 0:
+                prev = notes.pop()
+                prev_freq, prev_dur, prev_vol = prev[0], prev[1], prev[2]
+                prev_wave = prev[3] if len(prev) > 3 else 0
+                notes.append((prev_freq, prev_dur + duration_int, prev_vol, prev_wave))
+            else:
+                notes.append((0, duration_int, 0, wave_type))
+                
+            tied = False
             
     return notes, tempo, volume
 
@@ -104,6 +133,7 @@ def parse_mml(mml):
       Ox: Octave (0-8)
       Lxx: Default length
       Vxxx: Volume (0-100)
+      @x: Wave type (0=Square, 1=Sawtooth, 2=Triangle, 3=Noise)
       CDEFGAB[#+-][x][.]: Note, optional sharp/flat, optional length, optional dot
       R[x][.]: Rest
       < >: Octave down/up
