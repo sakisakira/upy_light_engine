@@ -25,7 +25,9 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
     volume = initial_volume
     wave_type = 0
     
-    notes = []
+    intro_notes = []
+    loop_notes = []
+    current_notes = intro_notes
     
     def get_num(default_val):
         nonlocal i
@@ -47,6 +49,10 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
             
         elif c == '&':
             tied = True
+            continue
+            
+        elif c == '$':
+            current_notes = loop_notes
             continue
             
         elif c == '@':
@@ -89,12 +95,12 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
             freq_int = int(freq)
             duration_int = int(duration_ms)
             
-            if tied and notes and notes[-1][0] == freq_int and (len(notes[-1]) < 4 or notes[-1][3] == wave_type):
-                prev = notes.pop()
+            if tied and current_notes and current_notes[-1][0] == freq_int and (len(current_notes[-1]) < 4 or current_notes[-1][3] == wave_type):
+                prev = current_notes.pop()
                 prev_freq, prev_dur, prev_vol = prev[0], prev[1], prev[2]
-                notes.append((prev_freq, prev_dur + duration_int, prev_vol, wave_type))
+                current_notes.append((prev_freq, prev_dur + duration_int, prev_vol, wave_type))
             else:
-                notes.append((freq_int, duration_int, volume, wave_type))
+                current_notes.append((freq_int, duration_int, volume, wave_type))
                 
             tied = False
             
@@ -112,21 +118,21 @@ def _parse_single_track(mml, initial_tempo, initial_volume):
                 
             duration_int = int(duration_ms)
             
-            if tied and notes and notes[-1][0] == 0:
-                prev = notes.pop()
+            if tied and current_notes and current_notes[-1][0] == 0:
+                prev = current_notes.pop()
                 prev_freq, prev_dur, prev_vol = prev[0], prev[1], prev[2]
                 prev_wave = prev[3] if len(prev) > 3 else 0
-                notes.append((prev_freq, prev_dur + duration_int, prev_vol, prev_wave))
+                current_notes.append((prev_freq, prev_dur + duration_int, prev_vol, prev_wave))
             else:
-                notes.append((0, duration_int, 0, wave_type))
+                current_notes.append((0, duration_int, 0, wave_type))
                 
             tied = False
             
-    return notes, tempo, volume
+    return intro_notes, loop_notes, tempo, volume
 
 def parse_mml(mml):
     """
-    Parses an MML string and returns a list of tracks (each track is a list of note tuples).
+    Parses an MML string and returns (intro_tracks, loop_tracks).
     Tracks are separated by commas.
     Commands:
       Txxx: Tempo (BPM)
@@ -134,17 +140,21 @@ def parse_mml(mml):
       Lxx: Default length
       Vxxx: Volume (0-100)
       @x: Wave type (0=Square, 1=Sawtooth, 2=Triangle, 3=Noise)
+      $: Loop marker (notes after this will loop)
       CDEFGAB[#+-][x][.]: Note, optional sharp/flat, optional length, optional dot
       R[x][.]: Rest
       < >: Octave down/up
     """
-    tracks = []
+    intro_tracks = []
+    loop_tracks = []
     tempo = 120
     volume = 64
     
     parts = mml.split(',')
     for part in parts:
-        notes, tempo, volume = _parse_single_track(part, tempo, volume)
-        tracks.append(notes)
+        intro_notes, loop_notes, tempo, volume = _parse_single_track(part, tempo, volume)
+        intro_tracks.append(intro_notes)
+        loop_tracks.append(loop_notes)
         
-    return tracks
+    return intro_tracks, loop_tracks
+

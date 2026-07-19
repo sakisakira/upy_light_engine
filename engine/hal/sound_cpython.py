@@ -5,23 +5,21 @@ import sys
 class SoundHAL:
     def __init__(self):
         self.sample_rate = 44100
-        self.amplitude = 8000
-        self.current_sequence = []
-        self.is_playing = False
+        self.play_state = "stopped"
         self.play_start_time = 0
         self.total_duration = 0
         self.process = None
-        
-        if sys.platform == 'win32':
-            import tempfile
-            self.temp_wav = os.path.join(tempfile.gettempdir(), "upy_light_engine_beep.wav")
-        else:
-            self.temp_wav = "/tmp/upy_light_engine_beep.wav"
+        self.intro_wav_file = None
+        self.loop_wav_file = None
+        self.sfx_aliases = []
 
-    def _play_wav_os(self, path):
+    def _play_wav_os(self, path, loop=False):
         if sys.platform == 'win32':
             import winsound
-            winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            flags = winsound.SND_FILENAME | winsound.SND_ASYNC
+            if loop:
+                flags |= winsound.SND_LOOP
+            winsound.PlaySound(path, flags)
         elif sys.platform == 'darwin':
             import subprocess
             self.process = subprocess.Popen(["afplay", path])
@@ -40,59 +38,130 @@ class SoundHAL:
                 self.process = None
 
     def play_tone(self, freq, duration_ms):
-        self.play_sequence([(freq, duration_ms, 127)])
+        self.play_sequence([[(freq, duration_ms, 127)]])
 
-    def play_sequence(self, notes):
+    def play_sfx(self, notes, channel=3):
         if not notes:
             return
             
-        # Calculate total duration across all tracks
-        max_duration = 0
-        if isinstance(notes[0], list):
-            for track in notes:
-                dur = sum(note[1] for note in track)
-                if dur > max_duration: max_duration = dur
-        else:
+        # Wrap single track if needed
+        if len(notes) > 0 and isinstance(notes[0], tuple):
             notes = [notes]
-            max_duration = sum(note[1] for note in notes[0])
+            
+        from engine.hal import sound_synth_cpython
+        sfx_wav, _, _, _ = sound_synth_cpython.render_wavs(notes)
+        
+        if not sfx_wav:
+            return
+            
+        import tempfile
+        tmp = tempfile.gettempdir()
+        timestamp = int(time.time() * 1000)
+        sfx_path = os.path.join(tmp, f"upy_light_sfx_{timestamp}.wav")
+        
+        with open(sfx_path, "wb") as f:
+            f.write(sfx_wav)
+            
+        if sys.platform == 'win32':
+            import ctypes
+            alias = f"sfx_{timestamp}"
+            cmd_open = f'open "{sfx_path}" type waveaudio alias {alias}'
+            ctypes.windll.winmm.mciSendStringW(cmd_open, None, 0, None)
+            cmd_play = f'play {alias} from 0'
+            ctypes.windll.winmm.mciSendStringW(cmd_play, None, 0, None)
+            
+            # Store alias to clean up in update()
+            duration = sum(n[1] for n in notes[0]) / 1000.0 + 0.5
+            self.sfx_aliases.append((alias, time.time(), duration, sfx_path))
+        elif sys.platform == 'darwin':
+            import subprocess
+            subprocess.Popen(["afplay", sfx_path])
+        elif sys.platform.startswith('linux'):
+            import subprocess
+            subprocess.Popen(["aplay", "-q", sfx_path])
+
+    def play_sequence(self, intro_tracks, loop_tracks=None):
+        if not intro_tracks and not loop_tracks:
+            return
+            
+        # If it's a flat list of tuples (single track), wrap it
+        if intro_tracks and len(intro_tracks) > 0 and isinstance(intro_tracks[0], tuple):
+            intro_tracks = [intro_tracks]
+        if loop_tracks and len(loop_tracks) > 0 and isinstance(loop_tracks[0], tuple):
+            loop_tracks = [loop_tracks]
             
         self.stop()
-            
-        self.current_sequence = notes
-        self.total_duration = max_duration / 1000.0 + 0.5 # Add decay tail
         
-        # Generate the entire sequence as a single WAV in memory
-        from engine.hal import sound_synth
-        wav_content = sound_synth.render_wav(notes)
+        # Generate the sequence as WAV in memory
+        from engine.hal import sound_synth_cpython
+        intro_wav, loop_wav, intro_dur, loop_dur = sound_synth_cpython.render_wavs(intro_tracks, loop_tracks)
         
-        # Windows locks the file while playing asynchronously.
-        # To avoid PermissionError, we generate a unique filename each time.
-        if sys.platform == 'win32':
-            import tempfile
-            self.temp_wav = os.path.join(tempfile.gettempdir(), f"upy_light_engine_beep_{int(time.time()*1000)}.wav")
-            
-        # Save to temp file
-        with open(self.temp_wav, "wb") as f:
-            f.write(wav_content)
-            
-        # OS-specific playback
-        self._play_wav_os(self.temp_wav)
-            
-        self.is_playing = True
+        import tempfile
+        tmp = tempfile.gettempdir()
+        timestamp = int(time.time() * 1000)
+        self.intro_wav_file = os.path.join(tmp, f"upy_light_intro_{timestamp}.wav") if intro_wav else None
+        self.loop_wav_file = os.path.join(tmp, f"upy_light_loop_{timestamp}.wav") if loop_wav else None
+        
+        if intro_wav:
+            with open(self.intro_wav_file, "wb") as f:
+                f.write(intro_wav)
+        if loop_wav:
+            with open(self.loop_wav_file, "wb") as f:
+                f.write(loop_wav)
+                
         self.play_start_time = time.time()
+        
+        if intro_wav:
+            self._play_wav_os(self.intro_wav_file, loop=False)
+            self.play_state = "intro"
+            self.total_duration = intro_dur / 1000.0
+        elif loop_wav:
+            self._play_wav_os(self.loop_wav_file, loop=True)
+            self.play_state = "loop"
+            self.total_duration = loop_dur / 1000.0
 
     def stop(self):
-        if self.is_playing:
+        if self.play_state != "stopped":
             self._stop_wav_os()
-            self.is_playing = False
+            self.play_state = "stopped"
 
     def update(self):
-        if self.is_playing:
+        # Cleanup old sfx aliases on win32
+        if sys.platform == 'win32' and hasattr(self, 'sfx_aliases'):
+            now = time.time()
+            alive = []
+            import ctypes
+            for alias, start_t, dur, path in self.sfx_aliases:
+                if now - start_t > dur:
+                    ctypes.windll.winmm.mciSendStringW(f'close {alias}', None, 0, None)
+                    try:
+                        os.remove(path)
+                    except:
+                        pass
+                else:
+                    alive.append((alias, start_t, dur, path))
+            self.sfx_aliases = alive
+
+        if self.play_state == "intro":
+            intro_done = False
             if sys.platform != 'win32':
                 if self.process and self.process.poll() is not None:
-                    self.is_playing = False
-                    self.current_sequence = []
+                    intro_done = True
             else:
-                if time.time() - self.play_start_time > self.total_duration:
-                    self.is_playing = False
-                    self.current_sequence = []
+                if time.time() - self.play_start_time >= self.total_duration:
+                    intro_done = True
+                    
+            if intro_done:
+                if self.loop_wav_file:
+                    self._play_wav_os(self.loop_wav_file, loop=True)
+                    self.play_state = "loop"
+                    self.play_start_time = time.time()
+                else:
+                    self.play_state = "stopped"
+                    
+        elif self.play_state == "loop":
+            # For non-win32, we must manually restart the loop process if it ends
+            if sys.platform != 'win32':
+                if self.process and self.process.poll() is not None:
+                    self._play_wav_os(self.loop_wav_file, loop=True)
+                    self.play_start_time = time.time()

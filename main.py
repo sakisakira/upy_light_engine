@@ -174,7 +174,7 @@ def update():
         sound.play_mml(mml)
         
     if frames == 360:
-        sound.play_mml("V32 T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
+        sound.play_mml("$ V32 T180 O5 C8 E8 G8 O6 C4 O5 G8 E8 C2")
     
     if inp.button(inp.Button_Left):
         x -= 2

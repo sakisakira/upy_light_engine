@@ -108,9 +108,10 @@ class SoundHAL:
             self.tracks[channel] = notes
             self.track_indices[channel] = 0
             self.track_end_times[channel] = time.ticks_ms()
+            self.track_state[channel] = "oneshot"
             self._start_note_for_track(channel)
             
-    def play_sequence(self, tracks):
+    def play_sequence(self, intro_tracks, loop_tracks=None):
         if not self.is_ready: return
         self.stop()
         
@@ -119,15 +120,30 @@ class SoundHAL:
                 time.sleep_ms(10)
                 
         # If it's a flat list of tuples (single track), wrap it
-        if len(tracks) > 0 and isinstance(tracks[0], tuple):
-            tracks = [tracks]
+        if intro_tracks and len(intro_tracks) > 0 and isinstance(intro_tracks[0], tuple):
+            intro_tracks = [intro_tracks]
+        if loop_tracks and len(loop_tracks) > 0 and isinstance(loop_tracks[0], tuple):
+            loop_tracks = [loop_tracks]
             
+        self.intro_tracks = intro_tracks
+        self.loop_tracks = loop_tracks
         self.tracks = [None] * 4
         self.track_indices = [0] * 4
         self.track_end_times = [0] * 4
+        if not hasattr(self, 'track_state'):
+            self.track_state = ["stopped"] * 4
+        else:
+            for i in range(4): self.track_state[i] = "stopped"
         
+        target_tracks = self.intro_tracks if self.intro_tracks and any(t for t in self.intro_tracks) else self.loop_tracks
+        state = "intro" if self.intro_tracks and any(t for t in self.intro_tracks) else "loop"
+        
+        if not target_tracks:
+            return
+            
         if self.mode == "bare_i2s":
-            self.current_sequence = tracks[0] if len(tracks) > 0 else []
+            self.current_sequence = target_tracks[0] if len(target_tracks) > 0 else []
+            self.bare_i2s_state = state
             self.current_note_index = 0
             self.stop_request = False
             self.audio_thread_running = True
@@ -135,15 +151,29 @@ class SoundHAL:
         else:
             now = time.ticks_ms()
             for ch in range(4):
-                if ch < len(tracks):
-                    self.tracks[ch] = tracks[ch]
+                if ch < len(target_tracks) and target_tracks[ch]:
+                    self.tracks[ch] = target_tracks[ch]
                     self.track_indices[ch] = 0
                     self.track_end_times[ch] = now
+                    self.track_state[ch] = state
                     self._start_note_for_track(ch)
 
     def _audio_thread(self):
         amplitude = 8000
-        while not self.stop_request and self.current_note_index < len(self.current_sequence):
+        while not self.stop_request:
+            if self.current_note_index >= len(self.current_sequence):
+                if self.bare_i2s_state == "intro" and self.loop_tracks and len(self.loop_tracks) > 0 and self.loop_tracks[0]:
+                    self.bare_i2s_state = "loop"
+                    self.current_sequence = self.loop_tracks[0]
+                    self.current_note_index = 0
+                elif self.bare_i2s_state == "loop":
+                    self.current_note_index = 0
+                else:
+                    break
+                    
+            if self.current_note_index >= len(self.current_sequence):
+                break
+                
             note = self.current_sequence[self.current_note_index]
             freq = note[0]
             duration_ms = note[1]
@@ -187,10 +217,20 @@ class SoundHAL:
             
         idx = self.track_indices[ch]
         if idx >= len(self.tracks[ch]):
-            if self.mode == "c_module":
-                self.c_engine.set_channel(ch, 0, 0, 0)
-            self.tracks[ch] = None
-            return
+            if self.track_state[ch] == "intro" and self.loop_tracks and ch < len(self.loop_tracks) and self.loop_tracks[ch]:
+                self.track_state[ch] = "loop"
+                self.tracks[ch] = self.loop_tracks[ch]
+                self.track_indices[ch] = 0
+                idx = 0
+            elif self.track_state[ch] == "loop":
+                self.track_indices[ch] = 0
+                idx = 0
+            else:
+                if self.mode == "c_module":
+                    self.c_engine.set_channel(ch, 0, 0, 0)
+                self.tracks[ch] = None
+                self.track_state[ch] = "stopped"
+                return
             
         note = self.tracks[ch][idx]
         freq = note[0]
@@ -198,7 +238,7 @@ class SoundHAL:
         volume = note[2] if len(note) > 2 else 64
         wave_type = note[3] if len(note) > 3 else 0
         
-        self.track_end_times[ch] = time.ticks_add(time.ticks_ms(), duration)
+        self.track_end_times[ch] = time.ticks_add(self.track_end_times[ch] if idx > 0 else time.ticks_ms(), duration)
         
         if self.mode == "c_module":
             self.c_engine.set_channel(ch, freq, wave_type, volume)
@@ -220,6 +260,11 @@ class SoundHAL:
     def stop(self):
         self.stop_request = True
         self.tracks = [None] * 4
+        if not hasattr(self, 'track_state'):
+            self.track_state = ["stopped"] * 4
+        else:
+            for i in range(4): self.track_state[i] = "stopped"
+            
         if self.mode == "c_module":
             self.c_engine.stop_all()
         elif self.mode == "bare_i2s" and self.i2s:

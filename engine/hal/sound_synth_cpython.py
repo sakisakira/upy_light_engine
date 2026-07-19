@@ -9,14 +9,7 @@ class Synth:
         self.sample_rate = 44100
         engine_ctypes.core.sound_synth_init(self.sample_rate)
 
-    def render_wav(self, tracks):
-        """
-        Render a list of tracks to a WAV bytearray using the C sound engine.
-        tracks: list of track_notes
-        track_notes: list of (freq, duration_ms, volume, wave_type)
-        """
-        engine_ctypes.core.sound_synth_stop_all()
-
+    def _collect_events(self, tracks):
         max_duration_ms = 0
         events = []
         for ch, track in enumerate(tracks):
@@ -41,12 +34,16 @@ class Synth:
                 max_duration_ms = current_time
 
         events.sort(key=lambda x: x["time_ms"])
-                
-        # Add tail for decay of the last note (0.5s = 500ms)
-        max_duration_ms += 500
+        return events, max_duration_ms
+
+    def _render_segment(self, events, duration_ms, add_tail=False):
+        if add_tail:
+            duration_ms += 500
         
-        total_samples = int((max_duration_ms / 1000.0) * self.sample_rate)
-        
+        total_samples = int((duration_ms / 1000.0) * self.sample_rate)
+        if total_samples <= 0:
+            return b""
+            
         # Buffer for interleaved stereo (2 channels, 16-bit)
         out_buf = (ctypes.c_int16 * (total_samples * 2))()
         
@@ -65,7 +62,7 @@ class Synth:
                 next_time_ms = events[event_idx]["time_ms"]
                 chunk_samples = int(((next_time_ms - current_time_ms) / 1000.0) * self.sample_rate)
             else:
-                next_time_ms = max_duration_ms
+                next_time_ms = duration_ms
                 chunk_samples = total_samples - current_sample
                 
             if current_sample + chunk_samples > total_samples:
@@ -84,6 +81,33 @@ class Synth:
         data_bytes = bytes(out_buf)
         header = self._build_wav_header(len(data_bytes))
         return header + data_bytes
+
+    def render_wavs(self, intro_tracks, loop_tracks=None):
+        """
+        Render intro and loop tracks to WAV bytearrays while preserving oscillator phase.
+        Returns: (intro_wav_bytes, loop_wav_bytes, intro_duration_ms, loop_duration_ms)
+        """
+        engine_ctypes.core.sound_synth_stop_all()
+        
+        has_intro = any(len(t) > 0 for t in intro_tracks) if intro_tracks else False
+        has_loop = any(len(t) > 0 for t in loop_tracks) if loop_tracks else False
+        
+        intro_wav = None
+        loop_wav = None
+        intro_dur = 0
+        loop_dur = 0
+        
+        if has_intro:
+            intro_events, intro_dur = self._collect_events(intro_tracks)
+            # Add tail only if there is no loop following it
+            intro_wav = self._render_segment(intro_events, intro_dur, add_tail=not has_loop)
+            
+        if has_loop:
+            # Phase and oscillators continue naturally because we didn't stop_all
+            loop_events, loop_dur = self._collect_events(loop_tracks)
+            loop_wav = self._render_segment(loop_events, loop_dur, add_tail=False)
+            
+        return intro_wav, loop_wav, intro_dur, loop_dur
 
     def _build_wav_header(self, data_size):
         channels = 2 # Stereo interleaved from C engine
@@ -108,5 +132,5 @@ class Synth:
 
 _synth = Synth()
 
-def render_wav(tracks):
-    return _synth.render_wav(tracks)
+def render_wavs(intro_tracks, loop_tracks=None):
+    return _synth.render_wavs(intro_tracks, loop_tracks)

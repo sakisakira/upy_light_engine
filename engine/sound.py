@@ -24,9 +24,9 @@ def play_tone(freq, duration_ms):
 
 def play_mml(mml_string):
     """Parse and play an MML (Music Macro Language) string."""
-    notes = mml_parser.parse_mml(mml_string)
-    if notes:
-        _hal.play_sequence(notes)
+    intro_tracks, loop_tracks = mml_parser.parse_mml(mml_string)
+    if intro_tracks or loop_tracks:
+        _hal.play_sequence(intro_tracks, loop_tracks)
 
 def play_sfx(name):
     """Play a predefined sound effect."""
