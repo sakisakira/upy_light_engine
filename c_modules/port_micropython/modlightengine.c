@@ -38,7 +38,7 @@ static mp_obj_t image_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     
     if (n_args >= 4) {
         mp_buffer_info_t bufinfo;
-        mp_get_buffer_raise(args[3], &bufinfo, MP_BUFFER_RW);
+        mp_get_buffer_raise(args[3], &bufinfo, MP_BUFFER_READ);
         self->img.data = bufinfo.buf;
     } else {
         size_t size = self->img.width * self->img.height;
@@ -359,7 +359,12 @@ static mp_obj_t mod_init_display(size_t n_args, const mp_obj_t *args) {
 
     // Wait for any pending renders from the PREVIOUS run to finish before touching SPI!
     // This prevents Kernel Panics if the user soft-reboots while Core 1 is actively sending DMA chunks.
+    // Wait for any pending renders from the PREVIOUS run to finish before touching SPI!
+    // This prevents Kernel Panics if the user soft-reboots while Core 1 is actively sending DMA chunks.
     while (__atomic_load_n(&pending_render_jobs, __ATOMIC_SEQ_CST) > 0) {
+#ifdef MICROPY_EVENT_POLL_HOOK
+        MICROPY_EVENT_POLL_HOOK
+#endif
         taskYIELD();
     }
     
@@ -408,17 +413,23 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_init_display_obj, 6, 6, mod_init_
 
 static mp_obj_t mod_spi_write_cmd(mp_obj_t cmd_in) {
     uint8_t cmd = (uint8_t)mp_obj_get_int(cmd_in);
+    if (spi_disp_handle == NULL) return mp_const_none;
     gpio_set_level((gpio_num_t)pin_dc, 0); 
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
+    t.flags = SPI_TRANS_USE_TXDATA;
     t.length = 8;
-    t.tx_buffer = &cmd;
-    spi_device_polling_transmit(spi_disp_handle, &t);
+    t.tx_data[0] = cmd;
+    esp_err_t err = spi_device_transmit(spi_disp_handle, &t);
+    if (err != ESP_OK) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("SPI cmd error: %d"), err);
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_spi_write_cmd_obj, mod_spi_write_cmd);
 
 static mp_obj_t mod_spi_write_data(mp_obj_t data_in) {
+    if (spi_disp_handle == NULL) return mp_const_none;
     mp_buffer_info_t data_buf;
     mp_get_buffer_raise(data_in, &data_buf, MP_BUFFER_READ);
     
@@ -426,8 +437,18 @@ static mp_obj_t mod_spi_write_data(mp_obj_t data_in) {
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
     t.length = data_buf.len * 8;
-    t.tx_buffer = data_buf.buf;
-    spi_device_polling_transmit(spi_disp_handle, &t);
+    
+    if (data_buf.len <= 4) {
+        t.flags = SPI_TRANS_USE_TXDATA;
+        memcpy(t.tx_data, data_buf.buf, data_buf.len);
+    } else {
+        t.tx_buffer = data_buf.buf;
+    }
+    
+    esp_err_t err = spi_device_transmit(spi_disp_handle, &t);
+    if (err != ESP_OK) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("SPI data error: %d"), err);
+    }
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_spi_write_data_obj, mod_spi_write_data);
@@ -445,7 +466,7 @@ typedef struct {
 } RenderJob;
 
 enum {
-    kChunkHeight = 15,
+    kChunkHeight = 5,
     kNumChunks = 135 / kChunkHeight,
     kChunkPixels = 240 * kChunkHeight,
     kChunkBytes = kChunkPixels * 2
@@ -458,19 +479,24 @@ static void send_display_internal(uint8_t *src, uint16_t *pal) {
     if (spi_disp_handle == NULL) return;
     gpio_set_level((gpio_num_t)pin_dc, 1);
 
-    if (dma_chunk_bufs[0] == NULL) {
-        dma_chunk_bufs[0] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
-        dma_chunk_bufs[1] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
-        if (dma_chunk_bufs[0] == NULL) return;
+    if (dma_chunk_bufs[0] == NULL || dma_chunk_bufs[1] == NULL) {
+        if (dma_chunk_bufs[0] == NULL) dma_chunk_bufs[0] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
+        if (dma_chunk_bufs[1] == NULL) dma_chunk_bufs[1] = heap_caps_malloc(kChunkBytes, MALLOC_CAP_DMA);
+        if (dma_chunk_bufs[0] == NULL || dma_chunk_bufs[1] == NULL) {
+            // If either failed, don't attempt to send, or we will crash/hang SPI
+            if (dma_chunk_bufs[0]) { heap_caps_free(dma_chunk_bufs[0]); dma_chunk_bufs[0] = NULL; }
+            if (dma_chunk_bufs[1]) { heap_caps_free(dma_chunk_bufs[1]); dma_chunk_bufs[1] = NULL; }
+            return;
+        }
     }
 
     // Memory write (0x2C)
-    uint8_t cmd = 0x2C;
     spi_transaction_t t;
     gpio_set_level((gpio_num_t)pin_dc, 0);
     memset(&t, 0, sizeof(t));
+    t.flags = SPI_TRANS_USE_TXDATA;
     t.length = 8;
-    t.tx_buffer = &cmd;
+    t.tx_data[0] = 0x2C;
     spi_device_polling_transmit(spi_disp_handle, &t);
     gpio_set_level((gpio_num_t)pin_dc, 1); // Back to data mode for DMA chunks
 
@@ -488,15 +514,18 @@ static void send_display_internal(uint8_t *src, uint16_t *pal) {
         int src_offset = chunk * kChunkPixels;
         
         for (int p = 0; p < kChunkPixels; p++) {
-            dst[p] = pal[src[src_offset + p]];
+            uint16_t c = pal[src[src_offset + p]];
+            dst[p] = (c >> 8) | (c << 8);
         }
 
         memset(&chunk_trans[buf_idx], 0, sizeof(spi_transaction_t));
         chunk_trans[buf_idx].length = kChunkBytes * 8;
         chunk_trans[buf_idx].tx_buffer = dst;
         
-        spi_device_queue_trans(spi_disp_handle, &chunk_trans[buf_idx], portMAX_DELAY);
-        queued++;
+        esp_err_t err = spi_device_queue_trans(spi_disp_handle, &chunk_trans[buf_idx], portMAX_DELAY);
+        if (err == ESP_OK) {
+            queued++;
+        }
         buf_idx = 1 - buf_idx;
     }
 
@@ -557,6 +586,9 @@ static MP_DEFINE_CONST_FUN_OBJ_3(mod_submit_and_send_obj, mod_submit_and_send);
 
 static mp_obj_t mod_sync(void) {
     while (__atomic_load_n(&pending_render_jobs, __ATOMIC_SEQ_CST) > 0) {
+#ifdef MICROPY_EVENT_POLL_HOOK
+        MICROPY_EVENT_POLL_HOOK
+#endif
         taskYIELD(); // Yield without sleeping to reduce sync latency
     }
     return mp_const_none;

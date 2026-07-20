@@ -1,8 +1,8 @@
 # MicroPythonのCモジュールビルド用 Dockerfile
 # ESP32-S3向けの開発ツールが含まれるESP-IDFの公式イメージを使用します。
 # ※MicroPythonのバージョンに合ったIDFバージョンを選ぶ必要があります。
-# 現時点でのMicroPythonのesp32ポート推奨バージョンである v5.0.4 を指定しています。
-FROM espressif/idf:release-v5.3
+# 現時点でのMicroPythonのesp32ポート推奨バージョンである v5.5 を指定しています。
+FROM espressif/idf:release-v5.5
 
 # 追加で必要なパッケージのインストール
 ARG DEBIAN_FRONTEND=noninteractive

@@ -23,6 +23,18 @@ class SoundSynthWorklet extends AudioWorkletProcessor {
                 if (this.wasm) {
                     this.wasm.exports.sound_synth_stop_all();
                 }
+            } else if (event.data.type === 'play_ubgm') {
+                if (this.wasm && this.wasm.exports.malloc) {
+                    const data = event.data.data; // Array of numbers
+                    const len = data.length;
+                    const ptr = this.wasm.exports.malloc(len);
+                    const memory_u8 = new Uint8Array(this.wasm.exports.memory.buffer);
+                    for (let i = 0; i < len; i++) {
+                        memory_u8[ptr + i] = data[i];
+                    }
+                    this.wasm.exports.sound_synth_play_ubgm(ptr, len);
+                    this.wasm.exports.free(ptr);
+                }
             }
         };
     }

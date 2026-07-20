@@ -1,6 +1,4 @@
 import sys
-from engine import mml_parser
-
 # Select the appropriate HAL based on the platform
 if sys.platform == 'esp32':
     from engine.hal.sound_micropython import SoundHAL
@@ -24,6 +22,7 @@ def play_tone(freq, duration_ms):
 
 def play_mml(mml_string):
     """Parse and play an MML (Music Macro Language) string."""
+    from engine import mml_parser
     intro_tracks, loop_tracks = mml_parser.parse_mml(mml_string)
     if intro_tracks or loop_tracks:
         _hal.play_sequence(intro_tracks, loop_tracks)
@@ -65,10 +64,31 @@ def load_ubgm(filepath):
         
     return intro_tracks, loop_tracks
 
+# A preallocated buffer to avoid MemoryError during UBGM loading on memory-constrained devices.
+_ubgm_buffer = bytearray(2048) if sys.platform == 'esp32' else None
+_active_ubgm = None
+
 def play_ubgm(filepath):
     """Load and play a .ubgm binary file."""
-    intro_tracks, loop_tracks = load_ubgm(filepath)
-    _hal.play_sequence(intro_tracks, loop_tracks)
+    global _active_ubgm
+    if hasattr(_hal, "play_ubgm_data"):
+        if _ubgm_buffer is not None:
+            import os
+            size = os.stat(filepath)[6]
+            if size > len(_ubgm_buffer):
+                raise MemoryError(f"UBGM file {filepath} too large ({size} > {len(_ubgm_buffer)})")
+            with open(filepath, 'rb') as f:
+                f.readinto(_ubgm_buffer)
+            _hal.play_ubgm_data(memoryview(_ubgm_buffer)[:size])
+            _active_ubgm = _ubgm_buffer
+        else:
+            with open(filepath, 'rb') as f:
+                data = f.read()
+                _hal.play_ubgm_data(data)
+                _active_ubgm = data
+    else:
+        intro_tracks, loop_tracks = load_ubgm(filepath)
+        _hal.play_sequence(intro_tracks, loop_tracks)
 
 def play_loaded_ubgm(intro_tracks, loop_tracks):
     """Play UBGM tracks that were already loaded via load_ubgm()."""

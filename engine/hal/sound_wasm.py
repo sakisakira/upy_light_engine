@@ -94,6 +94,15 @@ class SoundHAL:
         
         self._post_message({"type": "set_channel", "ch": ch, "freq": freq, "wave_type": wave_type, "volume": volume})
             
+    def play_ubgm_data(self, data):
+        if not self.is_ready: return
+        self.stop()
+        
+        # Pass the raw bytearray to WASM AudioWorklet
+        # AudioWorklet will receive it and call sound_synth_play_ubgm()
+        data_list = list(data)
+        self._post_message({"type": "play_ubgm", "data": data_list})
+        
     def update(self):
         now = ticks_ms()
         for ch in range(4):

@@ -1,11 +1,11 @@
 import sys
 
 if sys.platform == 'esp32':
-    from engine.hal.framebuffer_micropython import Framebuffer, screen, run
+    from engine.hal.framebuffer_micropython import Framebuffer, screen
 elif sys.platform == 'emscripten':
-    from engine.hal.framebuffer_wasm import Framebuffer, screen, run
+    from engine.hal.framebuffer_wasm import Framebuffer, screen
 else:
-    from engine.hal.framebuffer_cpython import Framebuffer, screen, run
+    from engine.hal.framebuffer_cpython import Framebuffer, screen
 
 def color(r, g, b, a=255):
     """

@@ -16,31 +16,70 @@ class Font:
         if hasattr(self, 'char_w'):
             return
             
-        with open(filepath, 'rb') as f:
-            header = f.read(4)
+        import sys
+        is_frozen = False
+        data_bytes = None
+        if sys.platform == 'esp32':
+            try:
+                import font_data
+                name = filepath.split('/')[-1].replace('.afnt', '')
+                if hasattr(font_data, name):
+                    data_bytes = getattr(font_data, name)
+                    is_frozen = True
+            except ImportError:
+                pass
+
+        if is_frozen:
+            mv = memoryview(data_bytes)
+            header = bytes(mv[0:4])
             if header not in (b"AFNT", b"AFN2"):
-                raise ValueError(f"Invalid font file format: {filepath}")
-            
-            meta = f.read(4)
-            self.char_w = meta[0]
-            self.char_h = meta[1]
-            self.cols = meta[2]
-            self.rows = meta[3]
-            
+                raise ValueError(f"Invalid font format in frozen: {filepath}")
+            self.char_w = data_bytes[4]
+            self.char_h = data_bytes[5]
+            self.cols = data_bytes[6]
+            self.rows = data_bytes[7]
             self.char_map = None
+            
+            offset = 8
             if header == b"AFN2":
-                num_chars = int.from_bytes(f.read(2), 'little')
+                num_chars = int.from_bytes(bytes(mv[offset:offset+2]), 'little')
+                offset += 2
                 self.char_map = {}
                 for i in range(num_chars):
-                    cp = int.from_bytes(f.read(2), 'little')
+                    cp = int.from_bytes(bytes(mv[offset:offset+2]), 'little')
                     self.char_map[cp] = i
-            
+                    offset += 2
+                    
             img_w = self.char_w * self.cols
             img_h = self.char_h * self.rows
+            pixel_data = mv[offset:offset + img_w * img_h]
+        else:
+            with open(filepath, 'rb') as f:
+                header = f.read(4)
+                if header not in (b"AFNT", b"AFN2"):
+                    raise ValueError(f"Invalid font file format: {filepath}")
+                
+                meta = f.read(4)
+                self.char_w = meta[0]
+                self.char_h = meta[1]
+                self.cols = meta[2]
+                self.rows = meta[3]
+                
+                self.char_map = None
+                if header == b"AFN2":
+                    num_chars = int.from_bytes(f.read(2), 'little')
+                    self.char_map = {}
+                    for i in range(num_chars):
+                        cp = int.from_bytes(f.read(2), 'little')
+                        self.char_map[cp] = i
+                
+                img_w = self.char_w * self.cols
+                img_h = self.char_h * self.rows
+                
+                # Read pixel data (INDEX8) efficiently without intermediate bytes object
+                pixel_data = bytearray(img_w * img_h)
+                f.readinto(pixel_data)
             
-            # Read pixel data (INDEX8) efficiently without intermediate bytes object
-            pixel_data = bytearray(img_w * img_h)
-            f.readinto(pixel_data)
             
         self.image = Image(img_w, img_h, pixel_data)
         

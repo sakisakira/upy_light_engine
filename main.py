@@ -165,7 +165,7 @@ def update():
     if clock.is_paused:
         return
         
-    sound.update()
+    sound.update() # Required for SFX sequencing
     frames += 1
     
     if frames == 120:
@@ -323,4 +323,5 @@ if __name__ == "__main__":
     sprite_triangle = img_triangle.subimage(0, 0, img_triangle.width, img_triangle.height)
     
     # Start the game loop at 60 FPS
-    fb.run(update, draw, fps=60)
+    import engine
+    engine.run(update, draw, fps=60)

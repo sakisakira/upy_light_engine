@@ -143,12 +143,38 @@ static mp_obj_t sound_engine_stop_all(void) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(sound_engine_stop_all_obj, sound_engine_stop_all);
 
+static mp_obj_t sound_engine_set_channel_override(mp_obj_t ch_obj, mp_obj_t override_obj) {
+    if (!engine_running) return mp_const_none;
+    int ch = mp_obj_get_int(ch_obj);
+    bool override = mp_obj_is_true(override_obj);
+    sound_synth_set_channel_override(ch, override);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(sound_engine_set_channel_override_obj, sound_engine_set_channel_override);
+
+static mp_obj_t sound_engine_play_ubgm(mp_obj_t data_obj) {
+    if (!engine_running) return mp_const_none;
+    
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(data_obj, &bufinfo, MP_BUFFER_READ);
+    
+    bool success = sound_synth_play_ubgm((const uint8_t*)bufinfo.buf, bufinfo.len);
+    if (!success) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Failed to play UBGM (invalid data or out of memory)"));
+    }
+    
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(sound_engine_play_ubgm_obj, sound_engine_play_ubgm);
+
 static const mp_rom_map_elem_t sound_engine_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR__sound_engine) },
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&sound_engine_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&sound_engine_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_channel), MP_ROM_PTR(&sound_engine_set_channel_obj) },
     { MP_ROM_QSTR(MP_QSTR_stop_all), MP_ROM_PTR(&sound_engine_stop_all_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_channel_override), MP_ROM_PTR(&sound_engine_set_channel_override_obj) },
+    { MP_ROM_QSTR(MP_QSTR_play_ubgm), MP_ROM_PTR(&sound_engine_play_ubgm_obj) },
 };
 static MP_DEFINE_CONST_DICT(sound_engine_module_globals, sound_engine_module_globals_table);
 

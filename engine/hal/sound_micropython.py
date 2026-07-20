@@ -23,9 +23,7 @@ class SoundHAL:
         self.tracks = [None] * 4
         self.track_indices = [0] * 4
         self.track_end_times = [0] * 4
-        
-        # Keep old variables for M5 compatibility
-        self.current_note_end_time = 0
+        self.track_state = ["stopped"] * 4
         self.current_freq = 0
         
         self._init_hardware()
@@ -105,6 +103,8 @@ class SoundHAL:
         if self.mode == "bare_i2s": return # Not supported
         
         if len(notes) > 0 and isinstance(notes[0], tuple):
+            if self.mode == "c_module":
+                self.c_engine.set_channel_override(channel, True)
             self.tracks[channel] = notes
             self.track_indices[channel] = 0
             self.track_end_times[channel] = time.ticks_ms()
@@ -136,6 +136,9 @@ class SoundHAL:
             self.track_state = ["stopped"] * 4
         else:
             for i in range(4): self.track_state[i] = "stopped"
+            
+        if self.mode == "c_module":
+            for i in range(4): self.c_engine.set_channel_override(i, False)
         
         target_tracks = self.intro_tracks if self.intro_tracks and any(t for t in self.intro_tracks) else self.loop_tracks
         state = "intro" if self.intro_tracks and any(t for t in self.intro_tracks) else "loop"
@@ -225,18 +228,11 @@ class SoundHAL:
             
         idx = self.track_indices[ch]
         if idx >= len(self.tracks[ch]):
-            if self.track_state[ch] == "intro" and self.loop_tracks and ch < len(self.loop_tracks) and self.loop_tracks[ch]:
-                self.track_state[ch] = "loop"
-                self.tracks[ch] = self.loop_tracks[ch]
-                self.track_indices[ch] = 0
-                idx = 0
-            elif self.track_state[ch] == "loop":
-                self.track_indices[ch] = 0
-                idx = 0
-            else:
-                self.tracks[ch] = None
-                self.track_state[ch] = "stopped"
-                return None
+            if self.track_state[ch] == "oneshot" and self.mode == "c_module":
+                self.c_engine.set_channel_override(ch, False)
+            self.tracks[ch] = None
+            self.track_state[ch] = "stopped"
+            return None
             
         return self.tracks[ch][idx]
 
@@ -253,6 +249,12 @@ class SoundHAL:
         elif self.mode == "m5_speaker" and self.speaker and ch == 0:
             if freq > 0:
                 self.speaker.tone(freq, duration)
+            
+    def play_ubgm_data(self, data):
+        if not self.is_ready: return
+        self.stop()
+        if self.mode == "c_module":
+            self.c_engine.play_ubgm(data)
             
     def update(self):
         if self.mode == "bare_i2s": return

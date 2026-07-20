@@ -59,6 +59,8 @@ class Image:
     @classmethod
     def clear_cache(cls):
         cls._cache.clear()
+        if _global_buffer_manager is not None:
+            _global_buffer_manager.reset()
         
     @classmethod
     def load(cls, filename, buffer=None):

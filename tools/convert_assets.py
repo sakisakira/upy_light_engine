@@ -30,33 +30,35 @@ def process_directory(input_dir, output_palette_path):
         return
 
     print(f"Found {len(png_files)} PNG files. Building common palette...")
-    
-    unique_colors = set()
-    
-    # 1. Collect all unique colors
+    # 1. Gather all unique colors from all .png files, counting frequencies
+    color_counts = {}
     for png_path in png_files:
         img = Image.open(png_path).convert("RGBA")
-        pixels = img.load()
         width, height = img.size
+        pixels = img.load()
         for y in range(height):
             for x in range(width):
                 r, g, b, a = pixels[x, y]
                 if a >= 128:
-                    unique_colors.add((r, g, b))
+                    c = (r, g, b)
+                    color_counts[c] = color_counts.get(c, 0) + 1
                     
     # 2. Build palette
     # Index 0 is reserved for transparent (colorkey)
-    # Since Pyxel's transparent is typically black (0,0,0) and alpha=0, we just map anything with alpha<128 to index 0.
     palette = [(0, 0, 0)] 
     
-    if len(unique_colors) > 255:
-        print(f"Warning: Found {len(unique_colors)} colors. Quantizing to 255 colors.")
-        unique_colors = list(unique_colors)[:255]
+    # Sort colors by frequency (descending), then by RGB value to break ties deterministically
+    sorted_by_freq = sorted(color_counts.keys(), key=lambda c: (-color_counts[c], c))
+    
+    if len(sorted_by_freq) > 255:
+        print(f"Warning: Found {len(sorted_by_freq)} colors. Quantizing to 255 most frequent colors.")
+        top_colors = sorted_by_freq[:255]
     else:
-        print(f"Total unique solid colors found: {len(unique_colors)}")
-        unique_colors = list(unique_colors)
+        print(f"Total unique solid colors found: {len(sorted_by_freq)}")
+        top_colors = sorted_by_freq
         
-    palette.extend(unique_colors)
+    # Sort the final top colors by RGB for a deterministic and ordered palette
+    palette.extend(sorted(top_colors))
     
     # Pad palette to 256 colors using RGB332
     idx = len(palette)

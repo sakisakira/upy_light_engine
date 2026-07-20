@@ -9,6 +9,7 @@ param ()
 
 $script_dir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $project_root = Split-Path -Parent $script_dir
+Set-Location $project_root
 
 $emsdk_env = Join-Path $project_root "emsdk\emsdk_env.ps1"
 if (Test-Path $emsdk_env) {
@@ -36,7 +37,7 @@ if ($LASTEXITCODE -eq 0) {
 
 $sound_out_file = Join-Path $build_dir "sound_synth.wasm"
 Write-Host "Building WASM sound_synth ($sound_out_file)..."
-emcc c_modules/core/sound_synth.c -O3 -s STANDALONE_WASM=1 --no-entry -s EXPORTED_FUNCTIONS="['_sound_synth_init', '_sound_synth_set_channel', '_sound_synth_stop_all', '_sound_synth_render_wasm', '_sound_synth_get_wasm_buf_l', '_sound_synth_get_wasm_buf_r']" -o $sound_out_file
+emcc c_modules/core/sound_synth.c -O3 -s STANDALONE_WASM=1 --no-entry -s EXPORTED_FUNCTIONS="['_sound_synth_init', '_sound_synth_set_channel', '_sound_synth_stop_all', '_sound_synth_render_wasm', '_sound_synth_get_wasm_buf_l', '_sound_synth_get_wasm_buf_r', '_sound_synth_play_ubgm', '_malloc', '_free']" -o $sound_out_file
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "WASM sound_synth Build successful." -ForegroundColor Green
